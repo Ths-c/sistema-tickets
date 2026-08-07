@@ -1,4 +1,4 @@
-# Sistema de tickets — Soporte técnico distrital (ETMH)
+#gabriel Sistema de tickets — Soporte técnico distrital (ETMH)
 
 Sistema de gestión y trazabilidad de tickets para el proyecto de tecnología
 educativa en el que alumnos de 4° a 7° año de la Escuela Técnica de Monte
