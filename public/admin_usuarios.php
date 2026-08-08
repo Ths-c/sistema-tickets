@@ -16,6 +16,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'crear
     $email = trim($_POST['email'] ?? '') ?: null;
     $rol = $_POST['rol'] ?? '';
     $escuelaId = (int) ($_POST['escuela_id'] ?? 0) ?: null;
+    // admin y coordinador no pertenecen a una escuela puntual: se ignora
+    // cualquier valor que llegue en el campo, aunque lo manipulen a mano.
+    if (in_array($rol, ['admin', 'coordinador'], true)) {
+        $escuelaId = null;
+    }
     $anioCurso = trim($_POST['anio_curso'] ?? '') ?: null;
     $passwordInicial = $_POST['password'] ?? '';
 
@@ -84,14 +89,17 @@ require __DIR__ . '/../includes/header.php';
         <div class="grid-2">
             <div>
                 <label for="rol">Rol</label>
-                <select id="rol" name="rol" required onchange="document.getElementById('campo_anio').style.display = this.value === 'tecnico' ? 'block' : 'none'">
+                <select id="rol" name="rol" required onchange="
+                    document.getElementById('campo_anio').style.display = this.value === 'tecnico' ? 'block' : 'none';
+                    document.getElementById('campo_escuela').style.display = (this.value === 'admin' || this.value === 'coordinador') ? 'none' : 'block';
+                ">
                     <option value="solicitante">Solicitante (docente/directivo)</option>
                     <option value="tecnico">Técnico (alumno ETMH)</option>
                     <option value="coordinador">Coordinador</option>
                     <option value="admin">Administrador</option>
                 </select>
             </div>
-            <div>
+            <div id="campo_escuela">
                 <label for="escuela_id">Escuela</label>
                 <select id="escuela_id" name="escuela_id">
                     <option value="">—</option>

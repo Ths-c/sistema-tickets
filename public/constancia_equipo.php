@@ -40,6 +40,14 @@ if (!$puedeVer) {
 $puedeEditar = $esAdmin || $usuario['rol'] === 'coordinador'
     || ($usuario['rol'] === 'tecnico' && $ticket['tecnico_id'] === $usuario['id']);
 
+// Técnicos disponibles para elegir en las etapas de asignación y devolución
+// (se guarda el nombre como texto en la constancia, pero se elige de una lista,
+// no se escribe a mano).
+$tecnicos = $pdo->query(
+    "SELECT id, nombre, apellido, anio_curso FROM usuarios
+     WHERE rol = 'tecnico' AND activo = 1 ORDER BY apellido, nombre"
+)->fetchAll();
+
 $mensajeOk = null;
 $error = null;
 
@@ -362,8 +370,15 @@ $etapas = [
             </div>
             <div>
                 <label for="asignacion_nombre_tecnico">Técnico que recibe el equipo</label>
-                <input type="text" id="asignacion_nombre_tecnico" name="asignacion_nombre_tecnico"
-                       value="<?= $v('asignacion_nombre_tecnico', $ticket['tecnico_nombre'] ?? '') ?>">
+                <select id="asignacion_nombre_tecnico" name="asignacion_nombre_tecnico">
+                    <option value="">Seleccioná un técnico</option>
+                    <?php $tecnicoActualAsig = $acta['asignacion_nombre_tecnico'] ?? ($ticket['tecnico_nombre'] ?? ''); ?>
+                    <?php foreach ($tecnicos as $tec): $nombreTec = trim($tec['nombre'] . ' ' . $tec['apellido']); ?>
+                        <option value="<?= e($nombreTec) ?>" <?= $tecnicoActualAsig === $nombreTec ? 'selected' : '' ?>>
+                            <?= e($nombreTec) ?><?= $tec['anio_curso'] ? ' — ' . e($tec['anio_curso']) : '' ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
             </div>
         </div>
         <label for="asignacion_observaciones">Observaciones (opcional)</label>
@@ -403,8 +418,15 @@ $etapas = [
             </div>
             <div>
                 <label for="devolucion_nombre_tecnico">Técnico que devuelve</label>
-                <input type="text" id="devolucion_nombre_tecnico" name="devolucion_nombre_tecnico"
-                       value="<?= $v('devolucion_nombre_tecnico', $ticket['tecnico_nombre'] ?? '') ?>">
+                <select id="devolucion_nombre_tecnico" name="devolucion_nombre_tecnico">
+                    <option value="">Seleccioná un técnico</option>
+                    <?php $tecnicoActualDev = $acta['devolucion_nombre_tecnico'] ?? ($ticket['tecnico_nombre'] ?? ''); ?>
+                    <?php foreach ($tecnicos as $tec): $nombreTec = trim($tec['nombre'] . ' ' . $tec['apellido']); ?>
+                        <option value="<?= e($nombreTec) ?>" <?= $tecnicoActualDev === $nombreTec ? 'selected' : '' ?>>
+                            <?= e($nombreTec) ?><?= $tec['anio_curso'] ? ' — ' . e($tec['anio_curso']) : '' ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
             </div>
         </div>
         <label for="devolucion_estado_equipo">Estado del equipo al momento de la devolución</label>

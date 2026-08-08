@@ -814,8 +814,15 @@ button:active, .boton:active { transform: translateY(1px); }
 .notif-lista::-webkit-scrollbar { width: 4px; }
 .notif-lista::-webkit-scrollbar-thumb { background: var(--borde-fuerte); border-radius: 2px; }
 
-/* Ítem individual */
-.notif-item {
+/* Ítem individual.
+   Son <a>: se fijan los 4 estados del enlace explícitamente para que el
+   navegador nunca aplique su azul/violeta por defecto en :hover o :visited. */
+a.notif-item,
+a.notif-item:link,
+a.notif-item:visited,
+a.notif-item:hover,
+a.notif-item:active,
+a.notif-item:focus {
     display: flex;
     align-items: flex-start;
     gap: 0.65rem;
@@ -999,7 +1006,12 @@ button:active, .boton:active { transform: translateY(1px); }
    Bandeja de mensajes (mensajes.php)
 ================================================================ */
 .mensajes-lista { list-style: none; padding: 0; }
-.mensaje-item {
+a.mensaje-item,
+a.mensaje-item:link,
+a.mensaje-item:visited,
+a.mensaje-item:hover,
+a.mensaje-item:active,
+a.mensaje-item:focus {
     display: flex;
     align-items: flex-start;
     gap: 0.75rem;

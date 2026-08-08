@@ -59,6 +59,18 @@ $where = $condiciones ? ('WHERE ' . implode(' AND ', $condiciones)) : '';
 
 // ── Cancelación masiva (solo admin), aplicada al filtro actual ──────
 if ($esAdmin && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'cancelar_masivo') {
+    $confirmacion = trim($_POST['confirmacion'] ?? '');
+
+    $tieneFiltro = in_array($_POST['f_estado'] ?? '', $estadosValidos, true)
+        || (int) ($_POST['f_escuela_id'] ?? 0) > 0
+        || fechaValida(trim($_POST['f_fecha_desde'] ?? ''))
+        || fechaValida(trim($_POST['f_fecha_hasta'] ?? ''));
+
+    if (!$tieneFiltro) {
+        $error = 'Por seguridad, la cancelación masiva requiere al menos un filtro (estado, escuela o fecha). No se puede aplicar a todos los tickets del sistema de una sola vez.';
+    } elseif (strtoupper($confirmacion) !== 'CANCELAR') {
+        $error = 'Tenés que escribir "CANCELAR" en el campo de confirmación para ejecutar esta acción.';
+    } else {
     $condicionesCancelar = ['t.estado != "cancelado"'];
     $paramsCancelar = [];
 
@@ -104,6 +116,7 @@ if ($esAdmin && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? ''
             );
         }
         $mensajeOk = count($ticketsACancelar) . ' ticket(s) cancelado(s) correctamente.';
+    }
     }
 }
 
@@ -192,20 +205,41 @@ require __DIR__ . '/../includes/header.php';
     </form>
 
     <?php if ($esAdmin): ?>
+        <?php $hayFiltroActivo = $filtroEstado !== '' || $filtroEscuelaId > 0 || $filtroFechaDesde !== '' || $filtroFechaHasta !== ''; ?>
         <hr class="separador">
-        <form method="post" onsubmit="return confirm('Vas a cancelar <?= $totalCancelable ?> ticket(s) que coinciden con el filtro actual. Esta acción queda registrada en el historial de cada ticket. ¿Confirmar?')">
-            <input type="hidden" name="accion" value="cancelar_masivo">
-            <input type="hidden" name="f_estado" value="<?= e($filtroEstado) ?>">
-            <input type="hidden" name="f_escuela_id" value="<?= (int) $filtroEscuelaId ?>">
-            <input type="hidden" name="f_fecha_desde" value="<?= e($filtroFechaDesde) ?>">
-            <input type="hidden" name="f_fecha_hasta" value="<?= e($filtroFechaHasta) ?>">
-            <button type="submit" class="boton-peligro boton-sm" style="margin-top:0;" <?= $totalCancelable === 0 ? 'disabled' : '' ?>>
-                ✕ Cancelar los <?= $totalCancelable ?> ticket(s) filtrados
-            </button>
-        </form>
-        <p class="texto-3" style="margin-top:0.5rem;">
-            Cancela todos los tickets que coinciden con el filtro de arriba (excepto los ya cancelados). Si no elegís ningún filtro, se aplica a <strong>todos</strong> los tickets del sistema.
-        </p>
+        <?php if (!$hayFiltroActivo): ?>
+            <div class="aviso-acta" style="border-color:var(--amarillo); background:var(--amarillo-claro);">
+                <span>⚠ Por seguridad, la cancelación masiva solo está disponible cuando hay <strong>al menos un filtro aplicado</strong> (estado, escuela o fecha). Esto evita cancelar todos los tickets del sistema por accidente.</span>
+            </div>
+        <?php elseif ($totalCancelable > 0): ?>
+            <div class="alerta alerta-error" style="margin-bottom:0.75rem;">
+                <strong>⚠ Acción irreversible.</strong> Vas a cancelar <strong><?= $totalCancelable ?> ticket(s)</strong> que coinciden con el filtro aplicado arriba
+                (<?= e(implode(' · ', array_filter([
+                    $filtroEstado ? 'estado: ' . str_replace('_',' ',$filtroEstado) : null,
+                    $filtroEscuelaId ? 'escuela seleccionada' : null,
+                    $filtroFechaDesde ? 'desde: ' . $filtroFechaDesde : null,
+                    $filtroFechaHasta ? 'hasta: ' . $filtroFechaHasta : null,
+                ])) ?: 'sin detalle') ?>). Cada uno queda registrado en su historial, pero <strong>no se puede deshacer en lote</strong>.
+            </div>
+            <form method="post" id="formCancelarMasivo" onsubmit="return confirm('Última confirmación: se van a cancelar <?= $totalCancelable ?> ticket(s) ahora mismo. ¿Continuar?')">
+                <input type="hidden" name="accion" value="cancelar_masivo">
+                <input type="hidden" name="f_estado" value="<?= e($filtroEstado) ?>">
+                <input type="hidden" name="f_escuela_id" value="<?= (int) $filtroEscuelaId ?>">
+                <input type="hidden" name="f_fecha_desde" value="<?= e($filtroFechaDesde) ?>">
+                <input type="hidden" name="f_fecha_hasta" value="<?= e($filtroFechaHasta) ?>">
+                <label for="confirmacionCancelar">Para habilitar el botón, escribí <strong>CANCELAR</strong> acá:</label>
+                <input type="text" id="confirmacionCancelar" name="confirmacion" autocomplete="off"
+                       placeholder="CANCELAR" style="max-width:220px;"
+                       oninput="document.getElementById('btnCancelarMasivo').disabled = (this.value.trim().toUpperCase() !== 'CANCELAR');">
+                <div class="acciones-fila">
+                    <button type="submit" id="btnCancelarMasivo" class="boton-peligro boton-sm" style="margin-top:0;" disabled>
+                        ✕ Cancelar los <?= $totalCancelable ?> ticket(s) filtrados
+                    </button>
+                </div>
+            </form>
+        <?php else: ?>
+            <p class="texto-2">No hay tickets cancelables con el filtro actual (ya están todos cancelados).</p>
+        <?php endif; ?>
     <?php endif; ?>
 </div>
 

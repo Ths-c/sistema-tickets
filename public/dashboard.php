@@ -23,18 +23,33 @@ if (in_array($usuario['rol'], ['admin', 'coordinador'], true)) {
 }
 
 // Últimos 5 tickets relevantes para el usuario
-$sqlRecientes = match($usuario['rol']) {
-    'solicitante' => "SELECT t.id, t.titulo, t.estado, t.prioridad, t.fecha_creacion, e.nombre AS escuela
-                      FROM tickets t JOIN escuelas e ON e.id = t.escuela_id
-                      WHERE t.solicitante_id = {$usuario['id']} ORDER BY t.fecha_creacion DESC LIMIT 5",
-    'tecnico'     => "SELECT t.id, t.titulo, t.estado, t.prioridad, t.fecha_creacion, e.nombre AS escuela
-                      FROM tickets t JOIN escuelas e ON e.id = t.escuela_id
-                      WHERE t.tecnico_id = {$usuario['id']} ORDER BY t.fecha_creacion DESC LIMIT 5",
-    default       => "SELECT t.id, t.titulo, t.estado, t.prioridad, t.fecha_creacion, e.nombre AS escuela
-                      FROM tickets t JOIN escuelas e ON e.id = t.escuela_id
-                      ORDER BY t.fecha_creacion DESC LIMIT 5",
-};
-$recientes = $pdo->query($sqlRecientes)->fetchAll();
+// (consulta preparada con parámetro bindeado en todos los casos, nunca
+// se interpola una variable directamente dentro del texto del SQL)
+switch ($usuario['rol']) {
+    case 'solicitante':
+        $stmtRecientes = $pdo->prepare(
+            "SELECT t.id, t.titulo, t.estado, t.prioridad, t.fecha_creacion, e.nombre AS escuela
+             FROM tickets t JOIN escuelas e ON e.id = t.escuela_id
+             WHERE t.solicitante_id = :uid ORDER BY t.fecha_creacion DESC LIMIT 5"
+        );
+        $stmtRecientes->execute(['uid' => $usuario['id']]);
+        break;
+    case 'tecnico':
+        $stmtRecientes = $pdo->prepare(
+            "SELECT t.id, t.titulo, t.estado, t.prioridad, t.fecha_creacion, e.nombre AS escuela
+             FROM tickets t JOIN escuelas e ON e.id = t.escuela_id
+             WHERE t.tecnico_id = :uid ORDER BY t.fecha_creacion DESC LIMIT 5"
+        );
+        $stmtRecientes->execute(['uid' => $usuario['id']]);
+        break;
+    default:
+        $stmtRecientes = $pdo->query(
+            "SELECT t.id, t.titulo, t.estado, t.prioridad, t.fecha_creacion, e.nombre AS escuela
+             FROM tickets t JOIN escuelas e ON e.id = t.escuela_id
+             ORDER BY t.fecha_creacion DESC LIMIT 5"
+        );
+}
+$recientes = $stmtRecientes->fetchAll();
 
 require __DIR__ . '/../includes/header.php';
 

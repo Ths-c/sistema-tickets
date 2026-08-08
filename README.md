@@ -1,4 +1,4 @@
-#gabriel Sistema de tickets — Soporte técnico distrital (ETMH)
+# Sistema de tickets — Soporte técnico distrital (ETMH)
 
 Sistema de gestión y trazabilidad de tickets para el proyecto de tecnología
 educativa en el que alumnos de 4° a 7° año de la Escuela Técnica de Monte
@@ -48,6 +48,28 @@ Hermoso brindan soporte técnico al resto de las escuelas del distrito.
   (con su propio contador en el menú lateral), mientras que la campana 🔔
   sigue mostrando únicamente los cambios de estado de los tickets. Para
   admin y técnico no cambia nada: siguen viendo todo junto en la campana.
+- **Alta de usuarios simplificada**: el campo "Escuela" ya no aparece al
+  crear un admin o coordinador (se oculta solo, según el rol elegido), y
+  el servidor ignora igual cualquier `escuela_id` que llegue para esos dos
+  roles, así no queda un valor inconsistente aunque manipulen el formulario.
+- **Cancelación masiva de tickets, con barreras extra de seguridad**: no se
+  puede ejecutar sin al menos un filtro aplicado (no se puede cancelar
+  "todo el sistema" de un solo golpe), muestra qué filtro concreto se va a
+  aplicar y cuántos tickets alcanza, y el botón queda deshabilitado hasta
+  escribir la palabra "CANCELAR" a mano — todo esto validado también del
+  lado del servidor, no solo en el navegador.
+- **Constancia: el técnico se elige de una lista**, no se escribe a mano.
+  Tanto en la etapa de asignación como en la de devolución, el campo del
+  técnico es un menú desplegable con los técnicos activos del sistema.
+- **Seguridad de la base de datos**: se revisó todo el proyecto en busca de
+  SQL armado con datos del usuario pegados directamente en el texto de la
+  consulta. Se encontró y corrigió un caso en `dashboard.php` (usaba el ID
+  de sesión interpolado en el SQL en lugar de un parámetro bindeado) y se
+  agregó una capa extra en la conexión (`PDO::MYSQL_ATTR_MULTI_STATEMENTS`
+  en `false`) que impide ejecutar más de una sentencia por consulta. El
+  resto del sistema ya usaba exclusivamente consultas preparadas con
+  parámetros bindeados (nunca concatenación de texto), que es la forma
+  correcta de evitar inyección SQL — no había otros casos para corregir.
 - **Ciclo de vida del ticket**: nuevo → asignado → en proceso → resuelto →
   cerrado (con posibilidad de reabrir o cancelar).
 - **Trazabilidad real**: cada cambio de estado queda registrado en
