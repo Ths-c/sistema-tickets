@@ -70,6 +70,10 @@ Hermoso brindan soporte técnico al resto de las escuelas del distrito.
   resto del sistema ya usaba exclusivamente consultas preparadas con
   parámetros bindeados (nunca concatenación de texto), que es la forma
   correcta de evitar inyección SQL — no había otros casos para corregir.
+- **La prioridad ya no la elige el solicitante**: al cargar un ticket, ya
+  no aparece el campo de prioridad (se crea en "media" automáticamente).
+  La define o la cambia después el coordinador o el administrador desde la
+  pantalla del ticket, con un selector rápido junto al estado.
 - **Ciclo de vida del ticket**: nuevo → asignado → en proceso → resuelto →
   cerrado (con posibilidad de reabrir o cancelar).
 - **Trazabilidad real**: cada cambio de estado queda registrado en

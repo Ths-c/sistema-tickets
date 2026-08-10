@@ -150,6 +150,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $mensajeOk = 'Ticket cancelado.';
     }
 
+    // El solicitante ya no elige la prioridad al cargar el ticket: la define
+    // (o la cambia) el coordinador o el administrador al revisarlo.
+    if ($accion === 'cambiar_prioridad' && in_array($usuario['rol'], ['admin', 'coordinador'], true)) {
+        $nuevaPrioridad = $_POST['prioridad'] ?? '';
+        $prioridadesValidas = ['baja', 'media', 'alta', 'urgente'];
+        if (!in_array($nuevaPrioridad, $prioridadesValidas, true)) {
+            $error = 'Prioridad inválida.';
+        } elseif ($nuevaPrioridad === $ticket['prioridad']) {
+            $error = 'Esa ya es la prioridad actual.';
+        } else {
+            $pdo->prepare('UPDATE tickets SET prioridad = :p WHERE id = :id')
+                ->execute(['p' => $nuevaPrioridad, 'id' => $ticketId]);
+            $ticket['prioridad'] = $nuevaPrioridad;
+            $mensajeOk = 'Prioridad actualizada a "' . ucfirst($nuevaPrioridad) . '".';
+        }
+    }
+
     // El administrador puede forzar el ticket a cualquier estado, sin pasar por el flujo normal,
     // pero las actas obligatorias siguen aplicando: no es una vía para saltearlas.
     if ($accion === 'forzar_estado' && $esAdmin) {
@@ -305,8 +322,26 @@ require __DIR__ . '/../includes/header.php';
     <div style="display:flex; align-items:baseline; gap:0.75rem; flex-wrap:wrap; margin-bottom:0.4rem;">
         <h1>#<?= (int) $ticket['id'] ?> · <?= e($ticket['titulo']) ?></h1>
         <span class="etiqueta estado-<?= e($ticket['estado']) ?>"><?= ucfirst(str_replace('_', ' ', $ticket['estado'])) ?></span>
-        <span class="prioridad-<?= e($ticket['prioridad']) ?> texto-sm">Prioridad <?= e($ticket['prioridad']) ?></span>
+
+        <?php if (in_array($usuario['rol'], ['admin', 'coordinador'], true)): ?>
+            <form method="post" style="margin:0; display:flex; align-items:center; gap:0.35rem;">
+                <input type="hidden" name="accion" value="cambiar_prioridad">
+                <label for="prioridad" class="texto-3 texto-sm" style="margin:0;">Prioridad:</label>
+                <select id="prioridad" name="prioridad" class="prioridad-<?= e($ticket['prioridad']) ?>"
+                        style="width:auto; padding:0.25rem 0.5rem; font-size:0.8rem; margin:0;"
+                        onchange="this.form.submit()">
+                    <?php foreach (['baja' => 'Baja', 'media' => 'Media', 'alta' => 'Alta', 'urgente' => 'Urgente'] as $val => $label): ?>
+                        <option value="<?= $val ?>" <?= $ticket['prioridad'] === $val ? 'selected' : '' ?>><?= $label ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </form>
+        <?php else: ?>
+            <span class="prioridad-<?= e($ticket['prioridad']) ?> texto-sm">Prioridad <?= e($ticket['prioridad']) ?></span>
+        <?php endif; ?>
     </div>
+    <?php if (in_array($usuario['rol'], ['admin', 'coordinador'], true)): ?>
+        <p class="texto-3 texto-sm" style="margin:0 0 0.5rem;">La prioridad la definen coordinación y administración, no el solicitante.</p>
+    <?php endif; ?>
     <?php if (in_array($usuario['rol'], ['admin', 'coordinador', 'tecnico'], true)): ?>
         <a href="constancia_equipo.php?id=<?= (int) $ticket['id'] ?>" class="boton boton-secundario boton-sm" style="margin-top:0.5rem;">
             📄 Constancia de entrega/recepción

@@ -52,13 +52,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $titulo      = trim($_POST['titulo']      ?? '');
         $descripcion = trim($_POST['descripcion'] ?? '');
         $categoriaId = (int) ($_POST['categoria_id'] ?? 0);
-        $prioridad   = $_POST['prioridad'] ?? 'media';
-        $prioridadesValidas = ['baja', 'media', 'alta', 'urgente'];
+        // La prioridad ya no la elige el solicitante al cargar el ticket
+        // (todos tienden a marcar "urgente"); se crea en "media" y la
+        // ajusta después el coordinador o el administrador desde el ticket.
+        $prioridad   = 'media';
 
         if ($titulo === '' || $descripcion === '' || $categoriaId <= 0) {
             $error = 'Completá título, descripción y categoría.';
-        } elseif (!in_array($prioridad, $prioridadesValidas, true)) {
-            $error = 'Prioridad inválida.';
         } else {
             $stmt = $pdo->prepare(
                 'INSERT INTO tickets (titulo, descripcion, categoria_id, prioridad, estado, escuela_id, solicitante_id)
@@ -161,29 +161,17 @@ require __DIR__ . '/../includes/header.php';
                    placeholder="Ej: No anda el proyector del aula 3"
                    value="<?= e($_POST['titulo'] ?? '') ?>">
 
-            <div class="grid-2">
-                <div>
-                    <label for="categoria_id">Categoría</label>
-                    <select id="categoria_id" name="categoria_id" required>
-                        <option value="">Elegí una categoría</option>
-                        <?php foreach ($categorias as $cat): ?>
-                            <option value="<?= (int)$cat['id'] ?>"
-                                <?= (isset($_POST['categoria_id']) && (int)$_POST['categoria_id'] === (int)$cat['id']) ? 'selected' : '' ?>>
-                                <?= e($cat['nombre']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div>
-                    <label for="prioridad">Prioridad</label>
-                    <select id="prioridad" name="prioridad">
-                        <option value="baja">Baja</option>
-                        <option value="media" selected>Media</option>
-                        <option value="alta">Alta</option>
-                        <option value="urgente">Urgente</option>
-                    </select>
-                </div>
-            </div>
+            <label for="categoria_id">Categoría</label>
+            <select id="categoria_id" name="categoria_id" required>
+                <option value="">Elegí una categoría</option>
+                <?php foreach ($categorias as $cat): ?>
+                    <option value="<?= (int)$cat['id'] ?>"
+                        <?= (isset($_POST['categoria_id']) && (int)$_POST['categoria_id'] === (int)$cat['id']) ? 'selected' : '' ?>>
+                        <?= e($cat['nombre']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <p class="texto-3" style="margin:-0.5rem 0 1rem;">La prioridad la define el coordinador o el administrador al revisar el ticket.</p>
 
             <label for="descripcion">Descripción del problema</label>
             <textarea id="descripcion" name="descripcion" required
