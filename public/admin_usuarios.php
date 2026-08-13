@@ -94,7 +94,7 @@ require __DIR__ . '/../includes/header.php';
                     document.getElementById('campo_escuela').style.display = (this.value === 'admin' || this.value === 'coordinador') ? 'none' : 'block';
                 ">
                     <option value="solicitante">Solicitante (docente/directivo)</option>
-                    <option value="tecnico">Técnico (alumno ETMH)</option>
+                    <option value="tecnico">Técnico (alumno CESDE)</option>
                     <option value="coordinador">Coordinador</option>
                     <option value="admin">Administrador</option>
                 </select>

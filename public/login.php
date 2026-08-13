@@ -40,8 +40,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <div class="login-wrap">
     <div class="login-card">
         <div class="login-logo">
-            <div class="login-logo-titulo">Soporte técnico distrital</div>
-            <div class="login-logo-sub">Escuela Técnica de Monte Hermoso</div>
+            <div class="login-logo-titulo">CESDE - Centro de Soporte Digital Educativo</div>
+            <div class="login-logo-sub">CESDE - Centro de Soporte Digital Educativo</div>
         </div>
 
         <?php if ($error): ?>

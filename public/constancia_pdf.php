@@ -58,7 +58,7 @@ $pdf->SetXY(18, 6);
 $pdf->Cell(0, 7, 'CONSTANCIA DE ENTREGA Y RECEPCION DE EQUIPO', 0, 1, 'C');
 $pdf->SetFont('Helvetica','', 9);
 $pdf->SetXY(18, 14);
-$pdf->Cell(0, 5, 'Proyecto de soporte tecnico distrital  |  Escuela Tecnica de Monte Hermoso', 0, 1, 'C');
+$pdf->Cell(0, 5, 'CESDE - Centro de Soporte Digital Educativo', 0, 1, 'C');
 $pdf->SetTextColor(15,23,42);
 $pdf->SetY(30);
 
@@ -177,7 +177,7 @@ $pdf->SetFont('Helvetica','I', 8);
 $pdf->SetTextColor(148,163,184);
 $pdf->MultiCell(0, 4,
     'Ambas partes declaran conformidad con lo consignado en este documento, en el marco del proyecto distrital '.
-    'de soporte tecnico educativo de la Escuela Tecnica de Monte Hermoso. '.
+    'de CESDE - Centro de Soporte Digital Educativo. '.
     'Documento generado el '.date('d/m/Y H:i').'.',
     0, 'C');
 

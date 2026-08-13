@@ -3,7 +3,7 @@ require_once __DIR__ . '/../config/sesion.php';
 requerirRol(['admin', 'coordinador']);
 
 $pdo = obtenerConexion();
-$tituloPagina = 'Reportes';
+$tituloPagina = 'CESDE - Reportes';
 
 // Tickets por escuela
 $porEscuela = $pdo->query(

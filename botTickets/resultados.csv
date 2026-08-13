@@ -1,0 +1,11 @@
+﻿n,estado,titulo,detalle
+1,creado,PC del laboratorio N°3 no enciende,ticket #1 enviado
+2,creado,Instalar LibreOffice en equipos del aula,ticket #2 enviado
+3,creado,WiFi caído en el aula 5,ticket #3 enviado
+4,creado,Windows de una maestra no arranca,ticket #4 enviado
+5,creado,Proyector no transmite imagen,ticket #5 enviado
+6,fallo,Acceso a cuenta institucional restringido,limite del servidor: max. 5 tickets abiertos por escuela
+7,fallo,Conexión de red del aula de informática con fallas,limite del servidor: max. 5 tickets abiertos por escuela
+8,fallo,Impresora de sala docente no imprime,limite del servidor: max. 5 tickets abiertos por escuela
+9,fallo,Actualizaciones pendientes en equipos del parque,limite del servidor: max. 5 tickets abiertos por escuela
+10,fallo,Revisión y limpieza general de equipos del gabinete,limite del servidor: max. 5 tickets abiertos por escuela

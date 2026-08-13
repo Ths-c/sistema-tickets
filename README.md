@@ -1,15 +1,15 @@
-# Sistema de tickets — Soporte técnico distrital (ETMH)
+# CESDE - Centro de Soporte Digital Educativo
 
 Sistema de gestión y trazabilidad de tickets para el proyecto de tecnología
-educativa en el que alumnos de 4° a 7° año de la Escuela Técnica de Monte
-Hermoso brindan soporte técnico al resto de las escuelas del distrito.
+educativa en el que alumnos de 4° a 7° año del CESDE brindan soporte técnico
+al resto de las escuelas del distrito.
 
 ## Qué incluye
 
 - **Ingreso por DNI**: cada usuario entra al sistema con su DNI (sin
   puntos ni espacios) y una contraseña, en vez de email. El sistema
   acepta que lo tipeen con puntos igual (los ignora automáticamente).
-- **Roles**: administrador, coordinador del proyecto, técnico (alumno ETMH),
+- **Roles**: administrador, coordinador del proyecto, técnico (alumno CESDE),
   solicitante (docente/directivo de cualquier escuela del distrito).
 - **El administrador tiene acceso total**: puede asignar o reasignar técnico
   en cualquier momento, actuar como técnico (marcar en proceso / resuelto),
@@ -112,13 +112,13 @@ Hermoso brindan soporte técnico al resto de las escuelas del distrito.
 ## 1. Instalación en localhost (Windows/Mac con XAMPP)
 
 1. Instalar [XAMPP](https://www.apachefriends.org/) (incluye Apache, PHP y MySQL).
-2. Copiar toda la carpeta `sistema-tickets` dentro de `htdocs` (en XAMPP suele
+2. Copiar toda la carpeta `cesde` dentro de `htdocs` (en XAMPP suele
    estar en `C:\xampp\htdocs\` o `/Applications/XAMPP/htdocs/`).
 3. Abrir XAMPP Control Panel y arrancar **Apache** y **MySQL**.
 4. Abrir **phpMyAdmin** (`http://localhost/phpmyadmin`), pestaña **SQL**,
    pegar el contenido de `sql/schema.sql` y ejecutar. Esto crea la base
    `tickets_distrital` con las tablas y 4 usuarios de prueba.
-5. Ir a `http://localhost/sistema-tickets/public/login.php`
+5. Ir a `http://localhost/cesde/public/login.php`
 
 ### Usuarios de prueba (contraseña para todos: `cambiar123`)
 
@@ -175,8 +175,6 @@ del servicio (no hace falta tocar el código).
 
 ## 4. Estructura del proyecto
 
-```
-sistema-tickets/
 ├── config/
 │   ├── conexion.php      # conexión PDO a MySQL
 │   └── sesion.php        # login, roles, helpers (historial, escape HTML)

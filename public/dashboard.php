@@ -56,7 +56,7 @@ require __DIR__ . '/../includes/header.php';
 $etiquetasRol = [
     'admin'       => 'Administrador del sistema',
     'coordinador' => 'Coordinador del proyecto',
-    'tecnico'     => 'Técnico de soporte (alumno ETMH)',
+    'tecnico'     => 'Técnico de soporte (alumno CESDE)',
     'solicitante' => 'Solicitante',
 ];
 ?>

@@ -46,7 +46,7 @@ if ($usuario) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= e($tituloPagina ?? 'Inicio') ?> · Soporte técnico distrital</title>
+    <title><?= e($tituloPagina ?? 'Inicio') ?> · CESDE - Centro de Soporte Digital Educativo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700;750&display=swap" rel="stylesheet">
@@ -65,7 +65,7 @@ if ($usuario) {
     <div class="sidebar-logo">
         <a href="dashboard.php">
             <div class="sidebar-logo-titulo">Soporte técnico</div>
-            <div class="sidebar-logo-sub">ETMH · Proyecto distrital</div>
+            <div class="sidebar-logo-sub">CESDE - Centro de Soporte Digital Educativo</div>
         </a>
     </div>
 

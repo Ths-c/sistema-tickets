@@ -1,0 +1,85 @@
+{
+  "base_url": "http://10.0.20.37/sistema-tickets/public/",
+  "cuentas": [
+    {
+      "dni": "34567845",
+      "password": "12345678",
+      "dni1": "34567846",
+      "password1": "12345678",
+      "dni2": "34567847",
+      "password2": "12345678",
+      "dni3": "34567848",
+      "password3": "12345678",
+      "dni4": "34567849",
+      "password4": "12345678",
+      "dni5": "34567850",
+      "password5": "12345678",
+      "dni6": "34567851",
+      "password6": "12345678",
+      "dni7": "34567852",
+      "password7": "12345678"
+    }
+  ],
+  "tickets": [
+    {
+      "titulo": "PC del laboratorio N°3 no enciende",
+      "descripcion": "Una de las computadoras del laboratorio N°3 (la más cercana a la ventana) no da señal de encendido. No funciona el botón ni se ilumina la fuente. Se solicita revisión.",
+      "categoria": "Hardware",
+      "prioridad": "media"
+    },
+    {
+      "titulo": "Instalar LibreOffice en equipos del aula",
+      "descripcion": "Falta instalar el paquete ofimático LibreOffice en las máquinas del aula de informática 2. Los equipos tienen el sistema operativo actualizado pero no el software de oficina.",
+      "categoria": "Software",
+      "prioridad": "media"
+    },
+    {
+      "titulo": "WiFi caído en el aula 5",
+      "descripcion": "El acceso a Internet por WiFi dejó de funcionar en el aula 5. Los equipos no encuentran la red y en algunos casos aparece como red restringida. Se solicita verificación del punto de acceso.",
+      "categoria": "Redes y conectividad",
+      "prioridad": "alta"
+    },
+    {
+      "titulo": "Windows de una maestra no arranca",
+      "descripcion": "El sistema operativo Windows de una de las máquinas del gabinete no inicia correctamente. Queda en pantalla azul o reinicia en bucle. Se requiere diagnóstico.",
+      "categoria": "Software",
+      "prioridad": "media"
+    },
+    {
+      "titulo": "Proyector no transmite imagen",
+      "descripcion": "El proyector del aula de biblioteca enciende pero no proyecta imagen. Se revisaron los cables y sigue sin señal. Posible falla del equipo o del cable HDMI.",
+      "categoria": "Hardware",
+      "prioridad": "media"
+    },
+    {
+      "titulo": "Acceso a cuenta institucional restringido",
+      "descripcion": "La cuenta con el correo institucional aparece como no permitida. No se puede iniciar sesión en los equipos del parque de computadoras. Se pide validar ese usuario y su contraseña.",
+      "categoria": "Cuentas y accesos",
+      "prioridad": "alta"
+    },
+    {
+      "titulo": "Conexión de red del aula de informática con fallas",
+      "descripcion": "El cableado de la red del aula de informática presenta contacto intermitente: hay equipos que pierden la conexión de forma constante durante el día escolar.",
+      "categoria": "Redes y conectividad",
+      "prioridad": "media"
+    },
+    {
+      "titulo": "Impresora de sala docente no imprime",
+      "descripcion": "La impresora compartida de la sala de profesores quedó en estado de error: no imprime desde ninguna de las computadoras conectadas.",
+      "categoria": "Hardware",
+      "prioridad": "media"
+    },
+    {
+      "titulo": "Actualizaciones pendientes en equipos del parque",
+      "descripcion": "Se detectaron actualizaciones críticas pendientes en varios equipos del parque. Se solicita aplicar las actualizaciones de sistema y paquetes de seguridad en los momentos de menor uso.",
+      "categoria": "Software",
+      "prioridad": "baja"
+    },
+    {
+      "titulo": "Revisión y limpieza general de equipos del gabinete",
+      "descripcion": "Se solicita una revisión general y limpieza externa de los equipos del gabinete técnico: ventilación, puertos y estado físico de los equipos que no están en uso.",
+      "categoria": "Otro",
+      "prioridad": "baja"
+    }
+  ]
+}

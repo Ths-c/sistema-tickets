@@ -163,7 +163,7 @@ if (isset($_GET['imprimir'])) {
         </div>
 
         <h1>Constancia de entrega y recepción de equipo</h1>
-        <p class="subt">Soporte técnico distrital · Escuela Técnica de Monte Hermoso<br>Ticket #<?= (int) $ticket['id'] ?> — <?= e($ticket['titulo']) ?></p>
+        <p class="subt">CESDE - Centro de Soporte Digital Educativo<br>Ticket #<?= (int) $ticket['id'] ?> — <?= e($ticket['titulo']) ?></p>
 
         <div class="fila">
             <div class="campo"><strong>Escuela</strong><div class="renglon"><?= e($ticket['escuela_nombre']) ?> — <?= e($ticket['escuela_localidad']) ?></div></div>
@@ -246,7 +246,7 @@ if (isset($_GET['imprimir'])) {
             </div>
         </div>
 
-        <p class="nota" style="margin-top:18px;">Todas las partes firman conformes con la información consignada en esta constancia, en el marco del proyecto distrital de soporte técnico de la Escuela Técnica de Monte Hermoso.</p>
+        <p class="nota" style="margin-top:18px;">Todas las partes firman conformes con la información consignada en esta constancia, en el marco de CESDE - Centro de Soporte Digital Educativo</p>
     </body>
     </html>
     <?php

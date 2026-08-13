@@ -149,12 +149,12 @@ class PDF extends FPDF
         $this->SetTextColor(...self::BLANCO);
         $this->SetFont('Helvetica','B', 14);
         $this->SetXY(10, 5);
-        $this->Cell(130, 7, 'Soporte Tecnico Distrital', 0, 0, 'L');
+        $this->Cell(130, 7, 'CESDE - Centro de Soporte Digital Educativo', 0, 0, 'L');
 
         $this->SetFont('Helvetica','', 8);
         $this->SetXY(10, 13);
         $this->SetTextColor(148, 163, 184);
-        $this->Cell(130, 5, 'Escuela Tecnica de Monte Hermoso  |  '.$this->subtitulo, 0, 0, 'L');
+        $this->Cell(130, 5, 'CESDE - Centro de Soporte Digital Educativo  |  '.$this->subtitulo, 0, 0, 'L');
 
         // Período (derecha)
         $this->SetFont('Helvetica','', 8);
@@ -173,7 +173,7 @@ class PDF extends FPDF
         $this->Rect(0, $this->GetY()-1, 210, 12, 'F');
         $this->SetFont('Helvetica','I', 7);
         $this->SetTextColor(...self::GRIS);
-        $this->Cell(95, 5, 'Sistema de gestion de soporte tecnico distrital — ETMH', 0, 0, 'L');
+        $this->Cell(95, 5, 'CESDE - Centro de Soporte Digital Educativo', 0, 0, 'L');
         $this->Cell(95, 5, 'Pagina '.$this->PageNo().'  |  Generado el '.date('d/m/Y H:i'), 0, 0, 'R');
     }
 
@@ -340,7 +340,7 @@ $pdf->AddPage();
 // ── PORTADA / Resumen ejecutivo ──────────────────────────────
 $pdf->SetFont('Helvetica','B', 13);
 $pdf->SetTextColor(...PDF::AZUL_OSCURO);
-$pdf->Cell(0, 8, 'Reporte Estadistico — Soporte Tecnico Distrital', 0, 1, 'C');
+$pdf->Cell(0, 8, 'Reporte Estadistico — CESDE - Centro de Soporte Digital Educativo', 0, 1, 'C');
 $pdf->SetFont('Helvetica','', 9);
 $pdf->SetTextColor(...PDF::GRIS);
 $pdf->Cell(0, 5, 'Periodo analizado: '.$pdf->periodo.'  |  Generado por: '.$user['nombre'].' '.$user['apellido'], 0, 1, 'C');
@@ -669,7 +669,7 @@ $pdf->Separador();
 $pdf->SetFont('Helvetica','I', 7.5);
 $pdf->SetTextColor(...PDF::GRIS);
 $pdf->MultiCell(190, 4,
-    'Este reporte fue generado automaticamente por el sistema de gestion de soporte tecnico distrital de la ETMH. '.
+    'Este reporte fue generado automaticamente por el sistema de gestion de CESDE - Centro de Soporte Digital Educativo. '.
     'Generado por: '.$user['nombre'].' '.$user['apellido'].' ('.$user['rol'].').  '.
     'Fecha de emision: '.date('d/m/Y H:i').'.', 0, 'C');
 

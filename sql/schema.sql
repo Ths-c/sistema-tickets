@@ -1,6 +1,6 @@
 -- =====================================================================
--- Sistema de Tickets — Proyecto Distrital de Tecnología Educativa
--- ETMH · Monte Hermoso
+-- CESDE - Centro de Soporte Digital Educativo
+-- Centro de Soporte Digital Educativo
 -- =====================================================================
 
 CREATE DATABASE IF NOT EXISTS tickets_distrital
@@ -240,9 +240,9 @@ INSERT INTO tipos_escuela (nombre, descripcion) VALUES
  ('Otro',        'Otro tipo de institución');
 
 INSERT INTO escuelas (nombre, localidad, tipo_id) VALUES
- ('Escuela Técnica de Monte Hermoso',  'Monte Hermoso', 3),
- ('Escuela Primaria N°1',              'Monte Hermoso', 1),
- ('Escuela Secundaria N°1',            'Monte Hermoso', 2);
+ ('CESDE - Centro de Soporte Digital Educativo',  'Monte Hermoso', 3),
+ ('CESDE - Escuela Primaria N°1',              'Monte Hermoso', 1),
+ ('CESDE - Escuela Secundaria N°1',            'Monte Hermoso', 2);
 
 INSERT INTO categorias (nombre, descripcion) VALUES
  ('Hardware',           'Problemas físicos: PC, impresoras, proyectores, periféricos'),
