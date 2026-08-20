@@ -96,6 +96,7 @@ if ($usuario) {
         <?= navLink('admin_tipos_escuela.php','◈', 'Tipos de escuela', $paginaActual) ?>
         <?= navLink('admin_categorias.php',   '◇', 'Categorías',       $paginaActual) ?>
         <?= navLink('admin_bloqueo.php',      '⊘', 'Control de acceso',$paginaActual) ?>
+        <?= navLink('admin_backup.php',       '💾', 'Backup',           $paginaActual) ?>
         <?php endif; ?>
     </nav>
 

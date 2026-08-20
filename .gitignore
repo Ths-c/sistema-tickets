@@ -1,0 +1,3 @@
+# Copias de seguridad de la base de datos (contienen datos sensibles)
+backups/*
+!backups/.gitkeep
