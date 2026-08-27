@@ -92,19 +92,22 @@ function e(?string $texto): string
  */
 function config(PDO $pdo, string $clave, string $default = ''): string
 {
-    static $cache = [];
-    if (!isset($cache[$clave])) {
+    if (!isset($GLOBALS['__cesde_config_cache'])) {
+        $GLOBALS['__cesde_config_cache'] = [];
+    }
+    if (!array_key_exists($clave, $GLOBALS['__cesde_config_cache'])) {
         $stmt = $pdo->prepare('SELECT valor FROM configuracion_sistema WHERE clave = :c');
         $stmt->execute(['c' => $clave]);
         $row = $stmt->fetch();
-        $cache[$clave] = $row ? (string)($row['valor'] ?? '') : $default;
+        $GLOBALS['__cesde_config_cache'][$clave] = $row ? (string)($row['valor'] ?? '') : $default;
     }
-    return $cache[$clave];
+    return $GLOBALS['__cesde_config_cache'][$clave];
 }
 
 /**
  * Graba un valor en la tabla configuracion_sistema.
  * Si la clave no existe la crea; si ya existe la actualiza.
+ * Actualiza también la caché en memoria para que config() devuelva el valor nuevo en la misma request.
  */
 function setConfig(PDO $pdo, string $clave, ?string $valor): void
 {
@@ -113,6 +116,10 @@ function setConfig(PDO $pdo, string $clave, ?string $valor): void
          VALUES (:c, :v)
          ON DUPLICATE KEY UPDATE valor = :v2'
     )->execute(['c' => $clave, 'v' => $valor, 'v2' => $valor]);
+    if (!isset($GLOBALS['__cesde_config_cache'])) {
+        $GLOBALS['__cesde_config_cache'] = [];
+    }
+    $GLOBALS['__cesde_config_cache'][$clave] = $valor ?? '';
 }
 
 /** Devuelve el acta de equipo del ticket (o null si todavía no existe la fila). */
@@ -211,6 +218,44 @@ function contarTicketsAbiertosEscuela(PDO $pdo, int $escuelaId): int
 function limiteTicketsAbiertosEscuela(PDO $pdo): int
 {
     return (int) config($pdo, 'limite_tickets_abiertos_escuela', '5');
+}
+
+/**
+ * Devuelve el límite configurado de dispositivos por ticket.
+ * Por defecto 2, configurable desde admin_bloqueo.php.
+ */
+function limiteDispositivosPorTicket(PDO $pdo): int
+{
+    $val = (int) config($pdo, 'limite_dispositivos_por_ticket', '2');
+    return $val > 0 ? $val : 2;
+}
+
+/**
+ * Cuenta cuántos dispositivos tiene un ticket.
+ */
+function contarDispositivosTicket(PDO $pdo, int $ticketId): int
+{
+    $stmt = $pdo->prepare('SELECT COUNT(*) FROM ticket_dispositivos WHERE ticket_id = :id');
+    $stmt->execute(['id' => $ticketId]);
+    return (int) $stmt->fetchColumn();
+}
+
+/**
+ * Devuelve todos los dispositivos de un ticket, ordenados por fecha.
+ */
+function obtenerDispositivosTicket(PDO $pdo, int $ticketId): array
+{
+    $stmt = $pdo->prepare('SELECT * FROM ticket_dispositivos WHERE ticket_id = :id ORDER BY fecha_creacion ASC, id ASC');
+    $stmt->execute(['id' => $ticketId]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Indica si se puede agregar otro dispositivo al ticket sin superar el límite.
+ */
+function puedeAgregarDispositivo(PDO $pdo, int $ticketId): bool
+{
+    return contarDispositivosTicket($pdo, $ticketId) < limiteDispositivosPorTicket($pdo);
 }
 
 /**

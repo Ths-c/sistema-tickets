@@ -43,6 +43,16 @@ $acta = $acta->fetch() ?: [];
 $v = fn(string $k, string $def='') => $acta[$k] ?? $def;
 $fmtFecha = fn(?string $f) => $f ? date('d/m/Y H:i', strtotime($f)) : '___/___/____  __:__';
 
+// Dispositivos vinculados (máximo 2)
+$dispositivosPdf = [];
+$limiteDispPdf = 2;
+try {
+    $limiteDispPdf = limiteDispositivosPorTicket($pdo);
+    $dispositivosPdf = obtenerDispositivosTicket($pdo, $ticketId);
+} catch (Throwable $e) {
+    $dispositivosPdf = [];
+}
+
 // ── PDF ─────────────────────────────────────────────────────
 $pdf = new FPDF('P','mm','A4');
 $pdf->SetMargins(18,18,18);
@@ -110,10 +120,26 @@ $seccion = function(string $titulo, int $num) use ($pdf): void {
     $pdf->Ln(3);
 };
 
-// ── Datos del equipo ─────────────────────────────────────────
-$seccion('DATOS DEL EQUIPO', 1);
-$campoDoble('Tipo de equipo',     $v('equipo_tipo'),          'Marca / Modelo',            $v('equipo_marca_modelo'));
-$campoDoble('N° de serie / Inventario', $v('equipo_numero_serie'), 'Accesorios entregados', $v('accesorios'));
+// ── Datos del equipo / Dispositivos ───────────────────────────
+$seccion('DATOS DEL EQUIPO'.(!empty($dispositivosPdf) ? ' — Dispositivos del ticket ('.count($dispositivosPdf).'/'.$limiteDispPdf.')' : ''), 1);
+if (!empty($dispositivosPdf)) {
+    foreach ($dispositivosPdf as $idx => $d) {
+        $n = $idx + 1;
+        $pdf->SetFont('Helvetica','B', 9);
+        $pdf->SetTextColor(37,99,235);
+        $pdf->Cell(0, 6, '  Dispositivo '.$n.': '.($d['tipo'] ?? ''), 0, 1, 'L');
+        $pdf->SetTextColor(15,23,42);
+        $campoDoble('Marca / Modelo (Disp. '.$n.')', $d['marca_modelo'] ?? '', 'N° serie / Inventario (Disp. '.$n.')', $d['numero_serie'] ?? '');
+        if (!empty($d['descripcion'])) {
+            $campoLinea('Falla reportada (Disp. '.$n.')', $d['descripcion']);
+        }
+    }
+    // Accesorios siguen siendo del acta general
+    $campoLinea('Accesorios entregados (acta)', $v('accesorios') ?: '');
+} else {
+    $campoDoble('Tipo de equipo',     $v('equipo_tipo'),          'Marca / Modelo',            $v('equipo_marca_modelo'));
+    $campoDoble('N° de serie / Inventario', $v('equipo_numero_serie'), 'Accesorios entregados', $v('accesorios'));
+}
 
 // ── Etapa 1: Entrega ─────────────────────────────────────────
 $seccion('ENTREGA DEL EQUIPO — Escuela al proyecto', 2);

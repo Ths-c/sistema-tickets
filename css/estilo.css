@@ -634,6 +634,46 @@ button:active, .boton:active { transform: translateY(1px); }
 .login-card label:first-of-type { margin-top: 0; }
 .login-card button { width: 100%; justify-content: center; margin-top: 1.5rem; padding: 0.65rem; }
 
+/* ── Campo contraseña con toggle ojo ────────────────────────── */
+.campo-password {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.campo-password input {
+    padding-right: 2.75rem;
+}
+.btn-mostrar-password {
+    position: absolute;
+    right: 0.4rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: auto !important;
+    margin-top: 0 !important;
+    padding: 0.35rem !important;
+    background: transparent !important;
+    border: none !important;
+    color: var(--texto-3);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radio-sm);
+    line-height: 1;
+}
+.btn-mostrar-password:hover {
+    background: var(--fondo) !important;
+    color: var(--texto-2);
+    box-shadow: none !important;
+}
+.btn-mostrar-password:active {
+    transform: translateY(-50%);
+}
+.btn-mostrar-password:focus-visible {
+    outline: 2px solid var(--acento);
+    outline-offset: 2px;
+}
+
 /* ── Constancia de equipo (vista impresión) ─────────────────── */
 @media print {
     .no-print { display: none !important; }

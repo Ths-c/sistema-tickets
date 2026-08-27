@@ -167,7 +167,24 @@ INSERT INTO configuracion_sistema (clave, valor, descripcion) VALUES
  ('bloqueo_fecha',        NULL, 'Fecha y hora en que se activó el bloqueo'),
  ('bloqueo_responsable',  NULL, 'Nombre del admin que activó el bloqueo'),
  ('limite_tickets_abiertos_escuela', '5',
-  'Cantidad máxima de tickets abiertos (no cerrados ni cancelados) que puede tener una misma escuela al mismo tiempo');
+  'Cantidad máxima de tickets abiertos (no cerrados ni cancelados) que puede tener una misma escuela al mismo tiempo'),
+ ('limite_dispositivos_por_ticket', '2',
+  'Cantidad máxima de dispositivos que puede tener un mismo ticket');
+
+-- ---------------------------------------------------------------------
+-- DISPOSITIVOS por ticket (máximo configurable, 2 por defecto)
+-- ---------------------------------------------------------------------
+CREATE TABLE ticket_dispositivos (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    ticket_id       INT NOT NULL,
+    tipo            VARCHAR(100) NOT NULL,
+    marca_modelo    VARCHAR(150) NULL,
+    numero_serie    VARCHAR(100) NULL,
+    descripcion     TEXT NULL,
+    fecha_creacion  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_dispositivos_ticket FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE,
+    INDEX idx_disp_ticket (ticket_id)
+) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
 -- NOTIFICACIONES por usuario

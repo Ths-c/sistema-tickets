@@ -122,6 +122,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $puedeEditar) {
 
 $acta = obtenerActaEquipo($pdo, $ticketId);
 
+// Dispositivos vinculados al ticket (máximo 2)
+$dispositivosConstancia = [];
+$limiteDispositivosConstancia = 2;
+try {
+    $limiteDispositivosConstancia = limiteDispositivosPorTicket($pdo);
+    $dispositivosConstancia = obtenerDispositivosTicket($pdo, $ticketId);
+} catch (PDOException $e) {
+    $dispositivosConstancia = [];
+}
+
 $v = fn(string $campo, string $default = '') => e($acta[$campo] ?? $default);
 $fechaInputValor = fn(?string $valor) => $valor ? str_replace(' ', 'T', substr($valor, 0, 16)) : '';
 
@@ -169,6 +179,22 @@ if (isset($_GET['imprimir'])) {
             <div class="campo"><strong>Escuela</strong><div class="renglon"><?= e($ticket['escuela_nombre']) ?> — <?= e($ticket['escuela_localidad']) ?></div></div>
             <div class="campo"><strong>Categoría del ticket</strong><div class="renglon"><?= e($ticket['categoria_nombre']) ?></div></div>
         </div>
+        <?php if (!empty($dispositivosConstancia)): ?>
+            <div style="margin-bottom:6px;"><strong>Dispositivos incluidos en el ticket (<?= count($dispositivosConstancia) ?>/<?= $limiteDispositivosConstancia ?>)</strong></div>
+            <?php foreach ($dispositivosConstancia as $idx => $d): ?>
+            <div class="fila" style="margin-bottom:4px; border:1px solid #ccc; padding:4px 6px;">
+                <div class="campo"><strong>Dispositivo <?= $idx+1 ?> — Tipo</strong><div class="renglon"><?= e($d['tipo']) ?></div></div>
+                <div class="campo"><strong>Marca / modelo</strong><div class="renglon"><?= e($d['marca_modelo'] ?? '') ?: '&nbsp;' ?></div></div>
+                <div class="campo"><strong>N° serie / inventario</strong><div class="renglon"><?= e($d['numero_serie'] ?? '') ?: '&nbsp;' ?></div></div>
+            </div>
+            <?php if (!empty($d['descripcion'])): ?>
+            <div class="fila"><div class="campo"><strong>Falla reportada — Disp. <?= $idx+1 ?></strong><div class="renglon"><?= e($d['descripcion']) ?></div></div></div>
+            <?php endif; ?>
+            <?php endforeach; ?>
+            <div class="fila">
+                <div class="campo"><strong>Accesorios (acta)</strong><div class="renglon"><?= $v('accesorios') ?: '&nbsp;' ?></div></div>
+            </div>
+        <?php else: ?>
         <div class="fila">
             <div class="campo"><strong>Tipo de equipo</strong><div class="renglon"><?= $v('equipo_tipo') ?: '&nbsp;' ?></div></div>
             <div class="campo"><strong>Marca / modelo</strong><div class="renglon"><?= $v('equipo_marca_modelo') ?: '&nbsp;' ?></div></div>
@@ -177,6 +203,7 @@ if (isset($_GET['imprimir'])) {
         <div class="fila">
             <div class="campo"><strong>Accesorios</strong><div class="renglon"><?= $v('accesorios') ?: '&nbsp;' ?></div></div>
         </div>
+        <?php endif; ?>
 
         <h2>1. Entrega del equipo (Escuela → Proyecto)</h2>
         <div class="fila">
@@ -294,6 +321,37 @@ $etapas = [
         ⬇ Descargar constancia PDF
     </a>
     <a href="ticket_detalle.php?id=<?= (int) $ticket['id'] ?>" class="boton boton-secundario">← Volver al ticket</a>
+</div>
+
+<div class="tarjeta">
+    <div class="tarjeta-titulo" style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem;">
+        <span>Dispositivos vinculados al ticket</span>
+        <span class="etiqueta <?= count($dispositivosConstancia) >= $limiteDispositivosConstancia ? 'estado-cancelado' : 'estado-nuevo' ?>">
+            <?= count($dispositivosConstancia) ?>/<?= $limiteDispositivosConstancia ?>
+        </span>
+    </div>
+    <p class="texto-2" style="margin-bottom:0.75rem; font-size:0.88rem;">
+        Estos son los equipos reportados en el ticket (máximo <?= $limiteDispositivosConstancia ?>). Se gestionan desde la pantalla del ticket y aparecen aquí para la constancia.
+    </p>
+    <?php if (empty($dispositivosConstancia)): ?>
+        <p class="texto-3" style="font-style:italic; margin-bottom:0.5rem;">Este ticket aún no tiene dispositivos cargados. Cargalos desde el ticket si corresponden.</p>
+        <a href="ticket_detalle.php?id=<?= (int)$ticket['id'] ?>#seccion-dispositivos" class="boton boton-secundario boton-sm">Ir a dispositivos del ticket →</a>
+    <?php else: ?>
+        <div style="display:grid; gap:0.6rem;">
+        <?php foreach ($dispositivosConstancia as $idx => $d): ?>
+            <div style="border:1px solid var(--borde); background:var(--fondo); border-radius:8px; padding:0.85rem 1rem;">
+                <div style="font-weight:700; font-size:0.92rem; margin-bottom:0.3rem;">Dispositivo <?= $idx+1 ?>: <?= e($d['tipo']) ?></div>
+                <div class="texto-2 texto-sm" style="line-height:1.5;">
+                    <?php if (!empty($d['marca_modelo'])): ?><strong>Marca/modelo:</strong> <?= e($d['marca_modelo']) ?><br><?php endif; ?>
+                    <?php if (!empty($d['numero_serie'])): ?><strong>N° serie:</strong> <?= e($d['numero_serie']) ?><br><?php endif; ?>
+                    <?php if (!empty($d['descripcion'])): ?><strong>Falla:</strong> <?= e($d['descripcion']) ?><br><?php endif; ?>
+                    <span class="texto-3">Cargado el <?= date('d/m/Y H:i', strtotime($d['fecha_creacion'])) ?></span>
+                </div>
+            </div>
+        <?php endforeach; ?>
+        </div>
+        <p class="texto-3" style="margin-top:0.6rem;">Para agregar o quitar dispositivos, hacelo desde <a href="ticket_detalle.php?id=<?= (int)$ticket['id'] ?>#seccion-dispositivos" style="font-weight:600;">el detalle del ticket</a>. El límite de <?= $limiteDispositivosConstancia ?> aplica también allí.</p>
+    <?php endif; ?>
 </div>
 
 <?php if (!$puedeEditar): ?>

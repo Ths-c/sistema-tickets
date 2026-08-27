@@ -52,6 +52,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ok = "Límite actualizado: cada escuela puede tener hasta {$limite} tickets abiertos al mismo tiempo.";
         }
     }
+
+    if ($accion === 'guardar_limite_dispositivos') {
+        $limiteDisp = (int) ($_POST['limite_dispositivos'] ?? 0);
+        if ($limiteDisp < 1 || $limiteDisp > 10) {
+            $error = 'El límite de dispositivos por ticket debe estar entre 1 y 10.';
+        } else {
+            setConfig($pdo, 'limite_dispositivos_por_ticket', (string) $limiteDisp);
+            $ok = "Límite actualizado: cada ticket puede incluir hasta {$limiteDisp} dispositivo" . ($limiteDisp === 1 ? '' : 's') . ".";
+        }
+    }
 }
 
 // ── Leer configuración actual ─────────────────────────────────
@@ -60,6 +70,7 @@ $msgHabilitado  = config($pdo, 'mensaje_habilitado');
 $bloqueoFecha   = config($pdo, 'bloqueo_fecha');
 $bloqueoResp    = config($pdo, 'bloqueo_responsable');
 $limiteActual   = limiteTicketsAbiertosEscuela($pdo);
+$limiteDispositivosActual = limiteDispositivosPorTicket($pdo);
 
 // Escuelas con bloqueo puntual activo (independiente del bloqueo global)
 $escuelasBloqueadas = $pdo->query(
@@ -175,6 +186,32 @@ require __DIR__ . '/../includes/header.php';
             <button type="submit">Guardar límite</button>
         </div>
     </form>
+</div>
+
+<!-- Límite de dispositivos por ticket -->
+<div class="tarjeta">
+    <div class="tarjeta-titulo">Límite de dispositivos por ticket</div>
+    <p class="texto-2" style="margin-bottom:1rem;">
+        Cada ticket puede incluir como máximo esta cantidad de dispositivos/equipos. El valor por defecto es <strong>2</strong>.
+        Si un ticket ya tiene este número de dispositivos, no se podrán agregar más hasta quitar alguno.
+        El límite se controla tanto al crear el ticket como al agregar dispositivos después, desde el detalle del ticket.
+    </p>
+    <form method="post" style="display:flex; align-items:flex-end; gap:0.75rem; flex-wrap:wrap;">
+        <input type="hidden" name="accion" value="guardar_limite_dispositivos">
+        <div style="min-width:160px;">
+            <label for="limite_dispositivos">Dispositivos máximos por ticket</label>
+            <input type="number" id="limite_dispositivos" name="limite_dispositivos" min="1" max="10" step="1"
+                   value="<?= (int) $limiteDispositivosActual ?>">
+        </div>
+        <div class="acciones-fila" style="margin:0;">
+            <button type="submit">Guardar límite</button>
+        </div>
+        <span class="texto-3" style="align-self:center; margin-left:0.5rem;">Actual: <?= (int)$limiteDispositivosActual ?> por ticket</span>
+    </form>
+    <p class="texto-3" style="margin-top:0.6rem;">
+        Tip: dejalo en 2 para cumplir la política solicitada de “dos dispositivos dentro de los tickets de las escuelas”.
+        Podés subirlo hasta 10 si alguna escuela necesita reportar más equipos a la vez.
+    </p>
 </div>
 
 <!-- Escuelas bloqueadas puntualmente -->

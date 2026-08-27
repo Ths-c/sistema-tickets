@@ -137,6 +137,10 @@ if ($esAdmin) {
     $totalCancelable = (int) $stmtPreview->fetchColumn();
 }
 
+// Intentar incluir conteo de dispositivos por ticket (máximo 2) — si la tabla aún no existe, se ignora sin romper el listado
+$limiteDispLista = 2;
+try { $limiteDispLista = limiteDispositivosPorTicket($pdo); } catch (Throwable $e) { $limiteDispLista = 2; }
+
 $sql = "SELECT t.id, t.titulo, t.prioridad, t.estado, t.fecha_creacion,
                e.nombre AS escuela, c.nombre AS categoria,
                CONCAT(tec.nombre, ' ', tec.apellido) AS tecnico
@@ -151,6 +155,20 @@ $sql = "SELECT t.id, t.titulo, t.prioridad, t.estado, t.fecha_creacion,
 $stmt = $pdo->prepare($sql);
 $stmt->execute($parametros);
 $tickets = $stmt->fetchAll();
+
+// Enriquecer con conteo de dispositivos si la tabla existe
+$dispCounts = [];
+try {
+    if (!empty($tickets)) {
+        $ids = array_column($tickets, 'id');
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $q = $pdo->prepare("SELECT ticket_id, COUNT(*) AS c FROM ticket_dispositivos WHERE ticket_id IN ($placeholders) GROUP BY ticket_id");
+        $q->execute($ids);
+        $dispCounts = array_column($q->fetchAll(), 'c', 'ticket_id');
+    }
+} catch (Throwable $e) {
+    $dispCounts = [];
+}
 
 require __DIR__ . '/../includes/header.php';
 ?>
@@ -256,12 +274,13 @@ require __DIR__ . '/../includes/header.php';
                 <th>Categoría</th>
                 <th>Prioridad</th>
                 <th>Estado</th>
+                <th style="text-align:center;" title="Dispositivos incluidos en el ticket (máximo <?= (int)$limiteDispLista ?>)">Disp.</th>
                 <th>Técnico</th>
                 <th>Creado</th>
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($tickets as $t): ?>
+            <?php foreach ($tickets as $t): $cDisp = (int)($dispCounts[$t['id']] ?? 0); ?>
             <tr onclick="window.location='ticket_detalle.php?id=<?= (int) $t['id'] ?>'" style="cursor:pointer;">
                 <td>#<?= (int) $t['id'] ?></td>
                 <td><?= e($t['titulo']) ?></td>
@@ -269,6 +288,11 @@ require __DIR__ . '/../includes/header.php';
                 <td><?= e($t['categoria']) ?></td>
                 <td class="prioridad-<?= e($t['prioridad']) ?>"><?= e(ucfirst($t['prioridad'])) ?></td>
                 <td><span class="etiqueta estado-<?= e($t['estado']) ?>"><?= e(ucfirst(str_replace('_', ' ', $t['estado']))) ?></span></td>
+                <td style="text-align:center;">
+                    <span class="etiqueta <?= $cDisp >= $limiteDispLista ? 'estado-cancelado' : ($cDisp > 0 ? 'estado-asignado' : 'estado-nuevo') ?>" style="font-size:0.72rem; padding:0.15rem 0.4rem;">
+                        <?= $cDisp ?>/<?= (int)$limiteDispLista ?>
+                    </span>
+                </td>
                 <td><?= e($t['tecnico'] ?? '—') ?></td>
                 <td><?= e(date('d/m/Y H:i', strtotime($t['fecha_creacion']))) ?></td>
             </tr>

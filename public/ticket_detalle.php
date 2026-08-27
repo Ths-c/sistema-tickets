@@ -264,6 +264,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // ── Gestión de dispositivos (límite de 2 por ticket) ──
+    if ($accion === 'agregar_dispositivo') {
+        $puedeGestionar = $esAdmin || in_array($usuario['rol'], ['coordinador'], true) || $ticket['solicitante_id'] === $usuario['id'];
+        if (!$puedeGestionar) {
+            $error = 'No tenés permiso para agregar dispositivos a este ticket.';
+        } elseif (in_array($ticket['estado'], ['cerrado', 'cancelado'], true)) {
+            $error = 'No se pueden agregar dispositivos a un ticket cerrado o cancelado.';
+        } else {
+            try {
+                $limiteDisp = limiteDispositivosPorTicket($pdo);
+                $actualDisp = contarDispositivosTicket($pdo, $ticketId);
+                if ($actualDisp >= $limiteDisp) {
+                    $error = "Este ticket ya tiene el máximo de {$limiteDisp} dispositivos permitidos. Eliminá uno antes de agregar otro.";
+                } else {
+                    $tipo        = trim($_POST['tipo'] ?? '');
+                    $marcaModelo = trim($_POST['marca_modelo'] ?? '') ?: null;
+                    $serie       = trim($_POST['numero_serie'] ?? '') ?: null;
+                    $desc        = trim($_POST['descripcion'] ?? '') ?: null;
+                    if ($tipo === '') {
+                        $error = 'Indicá el tipo de equipo (ej: Notebook, Proyector).';
+                    } else {
+                        $pdo->prepare(
+                            'INSERT INTO ticket_dispositivos (ticket_id, tipo, marca_modelo, numero_serie, descripcion)
+                             VALUES (:tid, :tipo, :marca, :serie, :desc)'
+                        )->execute([
+                            'tid'   => $ticketId,
+                            'tipo'  => $tipo,
+                            'marca' => $marcaModelo,
+                            'serie' => $serie,
+                            'desc'  => $desc,
+                        ]);
+                        $mensajeOk = 'Dispositivo agregado al ticket.';
+                    }
+                }
+            } catch (PDOException $e) {
+                // Si la tabla no existe aún
+                if (str_contains($e->getMessage(), 'ticket_dispositivos')) {
+                    $error = 'La función de dispositivos aún no está disponible (falta aplicar la migración SQL).';
+                } else {
+                    $error = 'No se pudo agregar el dispositivo.';
+                }
+            }
+        }
+    }
+
+    if ($accion === 'eliminar_dispositivo') {
+        $puedeGestionar = $esAdmin || in_array($usuario['rol'], ['coordinador'], true) || $ticket['solicitante_id'] === $usuario['id'];
+        if (!$puedeGestionar) {
+            $error = 'No tenés permiso para quitar dispositivos de este ticket.';
+        } elseif (in_array($ticket['estado'], ['cerrado', 'cancelado'], true)) {
+            $error = 'No se pueden quitar dispositivos de un ticket cerrado o cancelado.';
+        } else {
+            $dispId = (int) ($_POST['dispositivo_id'] ?? 0);
+            if ($dispId > 0) {
+                try {
+                    $pdo->prepare('DELETE FROM ticket_dispositivos WHERE id = :did AND ticket_id = :tid')
+                        ->execute(['did' => $dispId, 'tid' => $ticketId]);
+                    $mensajeOk = 'Dispositivo quitado del ticket.';
+                } catch (PDOException $e) {
+                    $error = 'No se pudo quitar el dispositivo.';
+                }
+            }
+        }
+    }
+
     // Volver a leer el ticket actualizado tras cualquier acción
     $stmt->execute(['id' => $ticketId]);
     $ticket = $stmt->fetch();
@@ -308,6 +373,20 @@ $adjuntos = $pdo->prepare(
 );
 $adjuntos->execute(['id' => $ticketId]);
 $adjuntos = $adjuntos->fetchAll();
+
+// Dispositivos del ticket (máximo 2 por ticket)
+$limiteDispositivos = 2;
+$dispositivos = [];
+try {
+    $limiteDispositivos = limiteDispositivosPorTicket($pdo);
+    $dispositivos = obtenerDispositivosTicket($pdo, $ticketId);
+} catch (PDOException $e) {
+    // Tabla aún no existe → se muestra vacío sin romper la página
+    $dispositivos = [];
+}
+$cantidadDispositivos = count($dispositivos);
+$puedeGestionarDispositivos = $esAdmin || in_array($usuario['rol'], ['coordinador'], true) || $ticket['solicitante_id'] === $usuario['id'];
+$ticketCerradoOCancelado = in_array($ticket['estado'], ['cerrado', 'cancelado'], true);
 
 require __DIR__ . '/../includes/header.php';
 ?>
@@ -384,6 +463,90 @@ require __DIR__ . '/../includes/header.php';
         </div>
         <?php endif; ?>
     </div>
+</div>
+
+<!-- Dispositivos del ticket (máximo 2) -->
+<div class="tarjeta" id="seccion-dispositivos">
+    <div class="tarjeta-titulo" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
+        <span>Dispositivos incluidos</span>
+        <span class="etiqueta <?= $cantidadDispositivos >= $limiteDispositivos ? 'estado-cancelado' : 'estado-nuevo' ?>" style="font-size:0.78rem;">
+            <?= $cantidadDispositivos ?>/<?= $limiteDispositivos ?> dispositivos
+        </span>
+    </div>
+    <p class="texto-2" style="margin-bottom:0.75rem; font-size:0.88rem;">
+        Cada ticket puede incluir hasta <strong><?= $limiteDispositivos ?> dispositivos</strong>. Si necesitás reportar más equipos, creá un ticket adicional.
+    </p>
+
+    <?php if (empty($dispositivos)): ?>
+        <p class="texto-3" style="margin-bottom:0.85rem; font-style:italic;">Aún no se cargaron dispositivos en este ticket.</p>
+    <?php else: ?>
+        <div style="display:grid; gap:0.75rem; margin-bottom:1rem;">
+        <?php foreach ($dispositivos as $idx => $d): ?>
+            <div style="border:1px solid var(--borde); background:var(--fondo); border-radius:8px; padding:0.9rem 1rem; display:flex; gap:1rem; align-items:flex-start; justify-content:space-between;">
+                <div style="flex:1;">
+                    <div style="font-weight:700; font-size:0.95rem; margin-bottom:0.25rem;">
+                        <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:var(--acento); color:#fff; font-size:0.72rem; margin-right:0.35rem;"><?= $idx+1 ?></span>
+                        <?= e($d['tipo']) ?>
+                    </div>
+                    <div class="texto-2 texto-sm" style="line-height:1.5;">
+                        <?php if (!empty($d['marca_modelo'])): ?> <strong>Marca/modelo:</strong> <?= e($d['marca_modelo']) ?><br><?php endif; ?>
+                        <?php if (!empty($d['numero_serie'])): ?> <strong>N° serie/inventario:</strong> <?= e($d['numero_serie']) ?><br><?php endif; ?>
+                        <?php if (!empty($d['descripcion'])): ?> <strong>Falla:</strong> <?= e($d['descripcion']) ?><br><?php endif; ?>
+                        <span class="texto-3">Agregado el <?= date('d/m/Y H:i', strtotime($d['fecha_creacion'])) ?></span>
+                    </div>
+                </div>
+                <?php if ($puedeGestionarDispositivos && !$ticketCerradoOCancelado): ?>
+                    <form method="post" onsubmit="return confirm('¿Quitar este dispositivo del ticket?')" style="margin:0;">
+                        <input type="hidden" name="accion" value="eliminar_dispositivo">
+                        <input type="hidden" name="dispositivo_id" value="<?= (int)$d['id'] ?>">
+                        <button type="submit" class="boton boton-secundario boton-sm" style="padding:0.25rem 0.6rem; font-size:0.78rem; background:#fff; border-color:var(--rojo); color:var(--rojo);">Quitar</button>
+                    </form>
+                <?php endif; ?>
+            </div>
+        <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+
+    <?php if ($puedeGestionarDispositivos && !$ticketCerradoOCancelado): ?>
+        <?php if ($cantidadDispositivos >= $limiteDispositivos): ?>
+            <div class="alerta" style="background:var(--rojo-claro); color:var(--rojo); border:1px solid var(--rojo); font-size:0.88rem; padding:0.6rem 0.85rem; margin:0;">
+                Llegaste al máximo de <?= $limiteDispositivos ?> dispositivos para este ticket. Si necesitás reportar más equipos, creá un ticket nuevo.
+            </div>
+        <?php else: ?>
+            <form method="post" style="background:#fff; border:1px solid var(--borde); border-radius:8px; padding:1rem;">
+                <input type="hidden" name="accion" value="agregar_dispositivo">
+                <div style="font-weight:650; font-size:0.9rem; margin-bottom:0.6rem;">Agregar dispositivo</div>
+                <div class="grid-2" style="gap:0.75rem;">
+                    <div>
+                        <label for="disp_tipo" style="font-size:0.82rem; margin-bottom:2px;">Tipo de equipo *</label>
+                        <input type="text" id="disp_tipo" name="tipo" required maxlength="100" placeholder="Ej: Notebook, Proyector, Impresora">
+                    </div>
+                    <div>
+                        <label for="disp_marca" style="font-size:0.82rem; margin-bottom:2px;">Marca / modelo</label>
+                        <input type="text" id="disp_marca" name="marca_modelo" maxlength="150" placeholder="Ej: Lenovo ThinkPad">
+                    </div>
+                </div>
+                <div class="grid-2" style="gap:0.75rem; margin-top:0.6rem;">
+                    <div>
+                        <label for="disp_serie" style="font-size:0.82rem; margin-bottom:2px;">N° de serie / inventario</label>
+                        <input type="text" id="disp_serie" name="numero_serie" maxlength="100" placeholder="Ej: SN12345">
+                    </div>
+                    <div>
+                        <label for="disp_desc" style="font-size:0.82rem; margin-bottom:2px;">Descripción de la falla</label>
+                        <input type="text" id="disp_desc" name="descripcion" maxlength="255" placeholder="Ej: No enciende">
+                    </div>
+                </div>
+                <div class="acciones-fila" style="margin-top:0.75rem;">
+                    <button type="submit" class="boton-sm">Agregar dispositivo</button>
+                    <span class="texto-3" style="margin-left:0.5rem;"><?= $cantidadDispositivos ?>/<?= $limiteDispositivos ?> usados</span>
+                </div>
+            </form>
+        <?php endif; ?>
+    <?php elseif ($ticketCerradoOCancelado): ?>
+        <p class="texto-3" style="font-size:0.82rem; margin:0;">Este ticket está <?= e($ticket['estado']) ?> y ya no se pueden agregar o quitar dispositivos.</p>
+    <?php else: ?>
+        <p class="texto-3" style="font-size:0.82rem; margin:0;">Solo el solicitante del ticket, coordinadores y administradores pueden gestionar los dispositivos.</p>
+    <?php endif; ?>
 </div>
 
 <!-- Acciones según estado y rol -->
