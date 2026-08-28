@@ -636,42 +636,51 @@ button:active, .boton:active { transform: translateY(1px); }
 
 /* ── Campo contraseña con toggle ojo ────────────────────────── */
 .campo-password {
-    position: relative;
     display: flex;
+    gap: 0.5rem;
     align-items: center;
 }
 .campo-password input {
-    padding-right: 2.75rem;
+    flex: 1;
+    min-width: 0;
 }
 .btn-mostrar-password {
-    position: absolute;
-    right: 0.4rem;
-    top: 50%;
-    transform: translateY(-50%);
-    width: auto !important;
+    flex-shrink: 0;
+    width: 36px !important;
+    height: 36px !important;
     margin-top: 0 !important;
-    padding: 0.35rem !important;
-    background: transparent !important;
-    border: none !important;
-    color: var(--texto-3);
+    padding: 0 !important;
+    background: var(--superficie) !important;
+    border: 1px solid var(--borde-fuerte) !important;
+    color: var(--texto-2);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: var(--radio-sm);
+    border-radius: var(--radio);
     line-height: 1;
+    box-shadow: var(--sombra-xs);
+    transition: background var(--transicion), border-color var(--transicion), color var(--transicion);
 }
 .btn-mostrar-password:hover {
     background: var(--fondo) !important;
-    color: var(--texto-2);
+    border-color: var(--borde-fuerte) !important;
+    color: var(--texto);
     box-shadow: none !important;
 }
 .btn-mostrar-password:active {
-    transform: translateY(-50%);
+    transform: none;
+    background: #e2e8f0 !important;
 }
 .btn-mostrar-password:focus-visible {
     outline: 2px solid var(--acento);
     outline-offset: 2px;
+    border-color: var(--acento) !important;
+}
+.btn-mostrar-password[aria-pressed="true"] {
+    background: var(--acento-claro) !important;
+    border-color: var(--acento) !important;
+    color: var(--acento);
 }
 
 /* ── Constancia de equipo (vista impresión) ─────────────────── */
