@@ -37,8 +37,8 @@ if (!$puedeVer) {
     die('No tenés permiso para ver esta constancia.');
 }
 
-$puedeEditar = $esAdmin || $usuario['rol'] === 'coordinador'
-    || ($usuario['rol'] === 'tecnico' && $ticket['tecnico_id'] === $usuario['id']);
+$esTecnicoAsignado = $usuario['rol'] === 'tecnico' && $ticket['tecnico_id'] === $usuario['id'];
+$puedeEditar = $esAdmin || $usuario['rol'] === 'coordinador' || $esTecnicoAsignado;
 
 // Técnicos disponibles para elegir en las etapas de asignación y devolución
 // (se guarda el nombre como texto en la constancia, pero se elige de una lista,
@@ -59,28 +59,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $puedeEditar) {
         'equipo_numero_serie'           => trim($_POST['equipo_numero_serie'] ?? ''),
         'accesorios'                    => trim($_POST['accesorios'] ?? ''),
 
-        'entrega_fecha'                 => $_POST['entrega_fecha'] ?? null,
-        'entrega_estado_equipo'         => trim($_POST['entrega_estado_equipo'] ?? ''),
-        'entrega_nombre_escuela'        => trim($_POST['entrega_nombre_escuela'] ?? ''),
-        'entrega_cargo_escuela'         => trim($_POST['entrega_cargo_escuela'] ?? ''),
-        'entrega_nombre_receptor'       => trim($_POST['entrega_nombre_receptor'] ?? ''),
-
-        'asignacion_fecha'              => $_POST['asignacion_fecha'] ?? null,
-        'asignacion_nombre_tecnico'     => trim($_POST['asignacion_nombre_tecnico'] ?? ''),
-        'asignacion_observaciones'      => trim($_POST['asignacion_observaciones'] ?? ''),
-
-        'resolucion_fecha'              => $_POST['resolucion_fecha'] ?? null,
-        'resolucion_trabajo_realizado'  => trim($_POST['resolucion_trabajo_realizado'] ?? ''),
-        'resolucion_estado_equipo'      => trim($_POST['resolucion_estado_equipo'] ?? ''),
-
-        'devolucion_fecha'              => $_POST['devolucion_fecha'] ?? null,
-        'devolucion_nombre_tecnico'     => trim($_POST['devolucion_nombre_tecnico'] ?? ''),
-        'devolucion_estado_equipo'      => trim($_POST['devolucion_estado_equipo'] ?? ''),
-        'devolucion_nombre_escuela'     => trim($_POST['devolucion_nombre_escuela'] ?? ''),
-        'devolucion_cargo_escuela'      => trim($_POST['devolucion_cargo_escuela'] ?? ''),
-
         'usuario_id'                    => $usuario['id'],
     ];
+
+    // Agregar campos de entrega y asignación solo si NO es técnico
+    if (!$esTecnicoAsignado) {
+        $datos['entrega_fecha']                 => $_POST['entrega_fecha'] ?? null,
+        $datos['entrega_estado_equipo']         => trim($_POST['entrega_estado_equipo'] ?? ''),
+        $datos['entrega_nombre_escuela']        => trim($_POST['entrega_nombre_escuela'] ?? ''),
+        $datos['entrega_cargo_escuela']         => trim($_POST['entrega_cargo_escuela'] ?? ''),
+        $datos['entrega_nombre_receptor']       => trim($_POST['entrega_nombre_receptor'] ?? '');
+
+        $datos['asignacion_fecha']              => $_POST['asignacion_fecha'] ?? null,
+        $datos['asignacion_nombre_tecnico']     => trim($_POST['asignacion_nombre_tecnico'] ?? ''),
+        $datos['asignacion_observaciones']      => trim($_POST['asignacion_observaciones'] ?? '');
+    }
+
+    // Siempre incluir resolucion y devolución (para técnicos también)
+    $datos['resolucion_fecha']              => $_POST['resolucion_fecha'] ?? null,
+    $datos['resolucion_trabajo_realizado']  => trim($_POST['resolucion_trabajo_realizado'] ?? ''),
+    $datos['resolucion_estado_equipo']      => trim($_POST['resolucion_estado_equipo'] ?? ''),
+
+    $datos['devolucion_fecha']              => $_POST['devolucion_fecha'] ?? null,
+    $datos['devolucion_nombre_tecnico']     => trim($_POST['devolucion_nombre_tecnico'] ?? ''),
+    $datos['devolucion_estado_equipo']      => trim($_POST['devolucion_estado_equipo'] ?? ''),
+    $datos['devolucion_nombre_escuela']     => trim($_POST['devolucion_nombre_escuela'] ?? ''),
+    $datos['devolucion_cargo_escuela']      => trim($_POST['devolucion_cargo_escuela'] ?? ''),
+    ;
     foreach (['entrega_fecha', 'asignacion_fecha', 'resolucion_fecha', 'devolucion_fecha'] as $campoFecha) {
         $datos[$campoFecha] = $datos[$campoFecha] !== '' ? str_replace('T', ' ', $datos[$campoFecha]) : null;
     }
@@ -292,6 +297,11 @@ $etapas = [
     'resolucion' => '3. Resolución',
     'devolucion' => '4. Devolución',
 ];
+
+// Para técnicos, solo mostrar las últimas 2 etapas
+$etapasParaTecnico = $esTecnicoAsignado
+    ? ['resolucion' => '3. Resolución', 'devolucion' => '4. Devolución']
+    : $etapas;
 ?>
 
 <h1>Constancia de entrega y recepción — Ticket #<?= (int) $ticket['id'] ?></h1>
@@ -303,12 +313,12 @@ $etapas = [
 <div class="tarjeta" style="margin-bottom:1rem;">
     <div class="tarjeta-titulo">Progreso de la constancia (<?= actaEtapasCompletas($acta) ?>/4)</div>
     <p class="texto-2" style="margin-bottom:0.75rem;">
-        Cada etapa es obligatoria para poder avanzar el ticket: sin el acta de entrega no se puede asignar técnico,
-        sin la de asignación no se puede pasar a "en proceso", sin la de resolución no se puede marcar como resuelto,
-        y sin la de devolución no se puede cerrar el ticket.
+        <?= $esTecnicoAsignado
+            ? 'Las etapas 3 (Resolución) y 4 (Devolución) son obligatorias para el técnico.'
+            : 'Cada etapa es obligatoria para poder avanzar el ticket: sin el acta de entrega no se puede asignar técnico, sin la de asignación no se puede pasar a "en proceso", sin la de resolución no se puede marcar como resuelto, y sin la de devolución no se puede cerrar el ticket.' ?>
     </p>
     <div class="etapas-acta">
-        <?php foreach ($etapas as $clave => $titulo): ?>
+        <?php foreach ($etapasParaTecnico as $clave => $titulo): ?>
             <a href="#etapa-<?= $clave ?>" class="etapa-acta-pill <?= $etapaOk($clave) ? 'etapa-ok' : 'etapa-pendiente' ?>">
                 <?= $etapaOk($clave) ? '✓' : '○' ?> <?= e($titulo) ?>
             </a>
@@ -384,6 +394,7 @@ $etapas = [
         </div>
     </div>
 
+    <?php if (!$esTecnicoAsignado): ?>
     <div class="tarjeta" id="etapa-entrega">
         <h2>
             1. Entrega del equipo (Escuela → Proyecto)
@@ -414,7 +425,9 @@ $etapas = [
             </div>
         </div>
     </div>
+<?php endif; ?>
 
+    <?php if (!$esTecnicoAsignado): ?>
     <div class="tarjeta" id="etapa-asignacion">
         <h2>
             2. Asignación a técnico (Proyecto → Técnico)
@@ -442,6 +455,7 @@ $etapas = [
         <label for="asignacion_observaciones">Observaciones (opcional)</label>
         <textarea id="asignacion_observaciones" name="asignacion_observaciones" placeholder="Cualquier detalle relevante de la asignación"><?= $v('asignacion_observaciones') ?></textarea>
     </div>
+<?php endif; ?>
 
     <div class="tarjeta" id="etapa-resolucion">
         <h2>

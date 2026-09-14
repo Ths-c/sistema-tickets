@@ -127,7 +127,7 @@ CREATE TABLE adjuntos (
     ruta_archivo    VARCHAR(255) NOT NULL,
     usuario_id      INT NOT NULL,
     fecha           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_adjuntos_ticket  FOREIGN KEY (ticket_id)  REFERENCES tickets(id) ON DELETE CASCADE,
+    CONSTRAINT fk_adjuntos_ticket  FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE,
     CONSTRAINT fk_adjuntos_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
 ) ENGINE=InnoDB;
 
@@ -154,7 +154,7 @@ CREATE TABLE configuracion_sistema (
     actualizado DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- Valores por defecto
+-- Configuración del sistema
 INSERT INTO configuracion_sistema (clave, valor, descripcion) VALUES
  ('tickets_bloqueados',   '0',
   'Si es 1, no se pueden crear nuevos tickets'),
@@ -198,7 +198,7 @@ CREATE TABLE notificaciones (
     leida       TINYINT(1) NOT NULL DEFAULT 0,
     fecha       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_notif_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-    CONSTRAINT fk_notif_ticket  FOREIGN KEY (ticket_id)  REFERENCES tickets(id)  ON DELETE CASCADE,
+    CONSTRAINT fk_notif_ticket  FOREIGN KEY (ticket_id) REFERENCES tickets(id)  ON DELETE CASCADE,
     INDEX idx_notif_usuario_leida (usuario_id, leida)
 ) ENGINE=InnoDB;
 
@@ -246,31 +246,10 @@ CREATE TABLE actas_equipo (
 ) ENGINE=InnoDB;
 
 -- =====================================================================
--- DATOS SEMILLA
+-- DATOS MINIMOS
 -- =====================================================================
 
-INSERT INTO tipos_escuela (nombre, descripcion) VALUES
- ('Primaria',    'Escuela de nivel primario'),
- ('Secundaria',  'Escuela de nivel secundario'),
- ('Técnica',     'Escuela técnica de nivel secundario'),
- ('Especial',    'Educación especial'),
- ('Otro',        'Otro tipo de institución');
-
-INSERT INTO escuelas (nombre, localidad, tipo_id) VALUES
- ('CESDE - Centro de Soporte Digital Educativo',  'Monte Hermoso', 3),
- ('CESDE - Escuela Primaria N°1',              'Monte Hermoso', 1),
- ('CESDE - Escuela Secundaria N°1',            'Monte Hermoso', 2);
-
-INSERT INTO categorias (nombre, descripcion) VALUES
- ('Hardware',           'Problemas físicos: PC, impresoras, proyectores, periféricos'),
- ('Software',           'Sistema operativo, programas, instalaciones, actualizaciones'),
- ('Redes y conectividad','WiFi, cableado, acceso a Internet, configuración de red'),
- ('Cuentas y accesos',  'Usuarios, contraseñas, permisos, correo institucional'),
- ('Otro',               'Cualquier otra consulta o problema');
-
--- Contraseña para todos: "cambiar123"
+-- Usuario administrador con DNI 48510302 y password 12345678
 INSERT INTO usuarios (nombre, apellido, dni, email, password_hash, rol, escuela_id, anio_curso) VALUES
- ('Admin',    'Sistema',      '30111222', 'admin@etmh.edu.ar',                '$2y$10$.Q7pq8FK9iVY4xvtZtkKBu/TLCsG44L7M/WFQRJZ9SJxvPpkfkROW', 'admin',        1, NULL),
- ('Laura',    'Coordinadora', '28222333', 'coordinacion@etmh.edu.ar',         '$2y$10$.Q7pq8FK9iVY4xvtZtkKBu/TLCsG44L7M/WFQRJZ9SJxvPpkfkROW', 'coordinador',  1, NULL),
- ('Juan',     'Pérez',        '45333444', 'juan.tecnico@etmh.edu.ar',         '$2y$10$.Q7pq8FK9iVY4xvtZtkKBu/TLCsG44L7M/WFQRJZ9SJxvPpkfkROW', 'tecnico',      1, '6to'),
- ('Mariana',  'Gómez',        '32444555', 'directora.primaria1@monte.edu.ar', '$2y$10$.Q7pq8FK9iVY4xvtZtkKBu/TLCsG44L7M/WFQRJZ9SJxvPpkfkROW', 'solicitante',  2, NULL);
+ ('Sistema',    'Default',      '48510302', 'sistema@cesde.local',                '$2b$12$5ebgRTTDJH5b2CmX10KfgOqoEyWXjFru4v52zOT2VDZ9OvWNgpOj6', 'admin',        NULL, NULL);
+

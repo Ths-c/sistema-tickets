@@ -143,11 +143,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($accion === 'cancelar' && in_array($usuario['rol'], ['admin', 'coordinador'], true)
             && ($esAdmin ? $ticket['estado'] !== 'cancelado' : !in_array($ticket['estado'], ['cerrado', 'cancelado'], true))) {
         $motivo = trim($_POST['motivo_cancelacion'] ?? '');
-        $pdo->prepare("UPDATE tickets SET estado = 'cancelado' WHERE id = :id")->execute(['id' => $ticketId]);
-        registrarHistorial($pdo, $ticketId, $ticket['estado'], 'cancelado', $usuario['id'], $motivo ?: 'Ticket cancelado');
-        crearNotificaciones($pdo, $ticketId, 'cambio_estado',
-            "Ticket #{$ticketId} cancelado: \"{$ticket['titulo']}\"", $usuario['id']);
-        $mensajeOk = 'Ticket cancelado.';
+        if ($motivo === '') {
+            $error = 'Debes ingresar un motivo para cancelar el ticket.';
+        } else {
+            $pdo->prepare("UPDATE tickets SET estado = 'cancelado' WHERE id = :id")->execute(['id' => $ticketId]);
+            registrarHistorial($pdo, $ticketId, $ticket['estado'], 'cancelado', $usuario['id'], $motivo);
+            crearNotificaciones($pdo, $ticketId, 'cambio_estado',
+                "Ticket #{$ticketId} cancelado: \"{$ticket['titulo']}\"", $usuario['id']);
+            $mensajeOk = 'Ticket cancelado.';
+        }
     }
 
     // El solicitante ya no elige la prioridad al cargar el ticket: la define
@@ -219,12 +223,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Hubo un problema al subir el archivo.';
         } else {
             $archivo = $_FILES['archivo'];
-            $extensionesPermitidas = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'];
-            $extension = strtolower(pathinfo($archivo['name'], PATHINFO_EXTENSION));
+            $esDeEscuela = !empty($usuario['escuela_id']) && $usuario['rol'] === 'solicitante';
+            $extensionesImagen = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+            $extensionesPDF = ['pdf'];
             $tamanioMaximo = 8 * 1024 * 1024; // 8 MB
 
+            if ($esDeEscuela) {
+                $extensionesPermitidas = $extensionesImagen;
+                $mensajeExt = 'Solo se permiten imágenes (jpg, png, gif, webp).';
+            } else {
+                $extensionesPermitidas = array_merge($extensionesImagen, $extensionesPDF);
+                $mensajeExt = 'Solo se permiten imágenes (jpg, png, gif, webp) o PDF.';
+            }
+
+            $extension = strtolower(pathinfo($archivo['name'], PATHINFO_EXTENSION));
+
             if (!in_array($extension, $extensionesPermitidas, true)) {
-                $error = 'Solo se permiten imágenes (jpg, png, gif, webp) o PDF.';
+                $error = $mensajeExt;
             } elseif ($archivo['size'] > $tamanioMaximo) {
                 $error = 'El archivo no puede superar los 8 MB.';
             } else {
@@ -763,8 +778,14 @@ require __DIR__ . '/../includes/header.php';
     <?php endif; ?>
     <form method="post" enctype="multipart/form-data">
         <input type="hidden" name="accion" value="subir_adjunto">
-        <label for="archivo" class="mt-0" style="margin-top:0.75rem;">Subir imagen o PDF (máx. 8 MB)</label>
-        <input type="file" id="archivo" name="archivo" accept=".jpg,.jpeg,.png,.gif,.webp,.pdf">
+        <label for="archivo" class="mt-0" style="margin-top:0.75rem;">
+            <?= !empty($usuario['escuela_id']) && $usuario['rol'] === 'solicitante' 
+                ? 'Subir imagen (máx. 8 MB)' 
+                : 'Subir imagen o PDF (máx. 8 MB)' ?>
+        </label>
+        <input type="file" id="archivo" name="archivo" accept="<?= !empty($usuario['escuela_id']) && $usuario['rol'] === 'solicitante' 
+            ? '.jpg,.jpeg,.png,.gif,.webp' 
+            : '.jpg,.jpeg,.png,.gif,.webp,.pdf' ?>">
         <div class="acciones-fila"><button type="submit">Subir adjunto</button></div>
     </form>
 </div>
