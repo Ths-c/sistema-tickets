@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../config/sesion.php';
 requerirRol(['admin', 'coordinador']);
 require_once __DIR__ . '/../lib/fpdf.php';
+require_once __DIR__ . '/../lib/pdf_texto.php';
 
 $pdo  = obtenerConexion();
 $user = usuarioActual();
@@ -116,6 +117,13 @@ $porMes = $pdo->query("
 // ════════════════════════════════════════════════════════════
 // CLASE PDF
 // ════════════════════════════════════════════════════════════
+// Conversión UTF-8 → Latin1 compartida en lib/pdf_texto.php.
+// Se mantiene este wrapper por compatibilidad con el resto del archivo.
+function reportePdfTxt($v): string
+{
+    return pdfTextoLatin1($v);
+}
+
 class PDF extends FPDF
 {
     // Colores de la paleta
@@ -134,6 +142,44 @@ class PDF extends FPDF
 
     public string $subtitulo = '';
     public string $periodo   = '';
+
+    // Conversión automática UTF-8 → Latin1 en toda salida de texto.
+    // Cubre todos los Cell/MultiCell/Write/Text del reporte (cabeceras,
+    // tablas de técnicos/escuelas/categorías, KPIs, nota final, etc.).
+    // El flag evita la doble conversión: el MultiCell()/Write() de FPDF
+    // llama internamente a $this->Cell() con el texto ya convertido.
+    protected bool $textoYaConvertido = false;
+
+    function Cell($w, $h = 0, $txt = '', $border = 0, $ln = 0, $align = '', $fill = false, $link = '')
+    {
+        $t = $this->textoYaConvertido ? (string) $txt : reportePdfTxt($txt);
+        parent::Cell($w, $h, $t, $border, $ln, $align, $fill, $link);
+    }
+
+    function MultiCell($w, $h, $txt, $border = 0, $align = 'J', $fill = false)
+    {
+        $this->textoYaConvertido = true;
+        try {
+            parent::MultiCell($w, $h, reportePdfTxt($txt), $border, $align, $fill);
+        } finally {
+            $this->textoYaConvertido = false;
+        }
+    }
+
+    function Write($h, $txt, $link = '')
+    {
+        $this->textoYaConvertido = true;
+        try {
+            parent::Write($h, reportePdfTxt($txt), $link);
+        } finally {
+            $this->textoYaConvertido = false;
+        }
+    }
+
+    function Text($x, $y, $txt)
+    {
+        parent::Text($x, $y, reportePdfTxt($txt));
+    }
 
     function Header()
     {
@@ -340,14 +386,15 @@ $pdf->AddPage();
 // ── PORTADA / Resumen ejecutivo ──────────────────────────────
 $pdf->SetFont('Helvetica','B', 13);
 $pdf->SetTextColor(...PDF::AZUL_OSCURO);
-$pdf->Cell(0, 8, 'Reporte Estadistico — CESDE - Centro de Soporte Digital Educativo', 0, 1, 'C');
+$pdf->Cell(0, 8, 'Reporte Estadistico - CESDE - Centro de Soporte Digital Educativo', 0, 1, 'C');
 $pdf->SetFont('Helvetica','', 9);
 $pdf->SetTextColor(...PDF::GRIS);
 $pdf->Cell(0, 5, 'Periodo analizado: '.$pdf->periodo.'  |  Generado por: '.$user['nombre'].' '.$user['apellido'], 0, 1, 'C');
 $pdf->Ln(4);
 
 // ── TARJETAS KPI ─────────────────────────────────────────────
-$cardW = 38; $cardH = 25; $gap = 2;
+// 5 tarjetas de 36mm + 4 gaps de 2mm = 188mm <= 190mm útiles (márgenes 10+10)
+$cardW = 36; $cardH = 25; $gap = 2;
 $startX = 10; $y0 = $pdf->GetY();
 
 $cards = [
@@ -579,7 +626,7 @@ $pdf->Ln(3);
 // ── EVOLUCIÓN MENSUAL ─────────────────────────────────────────
 if ($porMes) {
     $pdf->Seccion('Evolucion mensual (ultimos 6 meses)');
-    $wm = [35, 22, 22, 22, 90];
+    $wm = [35, 22, 22, 22, 89];
     $pdf->CabezalTbl(['Mes','Tickets','Resueltos','% Res.','Tendencia visual'], $wm);
     $maxMes = max(array_column($porMes, 'n')) ?: 1;
     foreach ($porMes as $i => $mes) {

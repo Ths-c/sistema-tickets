@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($titulo === '' || $descripcion === '' || $categoriaId <= 0) {
             $error = 'Completá título, descripción y categoría.';
         } else {
-            // ── Validar dispositivos (máximo $limiteDispositivos por ticket) ──
+            // ── Validar dispositivos (mínimo 1 y máximo $limiteDispositivos por ticket) ──
             $dispRaw = $_POST['dispositivos'] ?? [];
             $dispositivosValidos = [];
             if (is_array($dispRaw)) {
@@ -82,7 +82,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ];
                 }
             }
-            if (count($dispositivosValidos) > $limiteDispositivos) {
+            if (count($dispositivosValidos) < 1) {
+                $error = 'Tenés que incluir al menos un dispositivo en el ticket (indicá al menos el tipo de equipo).';
+            } elseif (count($dispositivosValidos) > $limiteDispositivos) {
                 $error = "Solo se permiten {$limiteDispositivos} dispositivos por ticket. Sacá " . (count($dispositivosValidos) - $limiteDispositivos) . " antes de crear el ticket.";
             } else {
                 $stmt = $pdo->prepare(
@@ -224,10 +226,10 @@ require __DIR__ . '/../includes/header.php';
             <textarea id="descripcion" name="descripcion" required
                 placeholder="Contá qué pasó, desde cuándo, y en qué equipo o aula"><?= e($_POST['descripcion'] ?? '') ?></textarea>
 
-            <!-- Dispositivos (máximo <?= $limiteDispositivos ?>) -->
+            <!-- Dispositivos (mínimo 1, máximo <?= $limiteDispositivos ?>) -->
             <div style="margin-top:1.25rem; border-top:1px solid var(--borde); padding-top:1rem;">
                 <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.75rem;">
-                    <label style="margin:0; font-weight:700;">Dispositivos incluidos <span class="texto-3" style="font-weight:400;">(máximo <?= $limiteDispositivos ?> por ticket)</span></label>
+                    <label style="margin:0; font-weight:700;">Dispositivos incluidos <span class="texto-3" style="font-weight:400;">(mínimo 1, máximo <?= $limiteDispositivos ?> por ticket)</span></label>
                     <span class="etiqueta estado-nuevo" id="contador-dispositivos">0/<?= $limiteDispositivos ?></span>
                 </div>
                 <p class="texto-3" style="margin:0 0 0.75rem;">Indicá qué equipos necesitan atención. Podés cargar hasta <?= $limiteDispositivos ?> dispositivos en un mismo ticket.</p>
@@ -308,6 +310,10 @@ require __DIR__ . '/../includes/header.php';
                 </div>
             `;
             card.querySelector('.btn-quitar').addEventListener('click', function(){
+                if (lista.querySelectorAll('.dispositivo-card').length <= 1) {
+                    alert('El ticket debe incluir al menos un dispositivo. Completá el tipo de equipo en lugar de quitarlo.');
+                    return;
+                }
                 card.remove();
                 renumerar();
                 actualizarEstado();
@@ -324,6 +330,17 @@ require __DIR__ . '/../includes/header.php';
         }
 
         btnAgregar.addEventListener('click', ()=> crearCard({}));
+
+        // El ticket exige al menos un dispositivo: no dejar enviar sin ninguno
+        // (red de seguridad del navegador; el servidor lo vuelve a validar).
+        const form = document.getElementById('form-ticket');
+        form.addEventListener('submit', function(ev){
+            if (lista.querySelectorAll('.dispositivo-card').length < 1) {
+                ev.preventDefault();
+                alert('Tenés que incluir al menos un dispositivo en el ticket.');
+                crearCard({});
+            }
+        });
 
         // Restaurar datos previos tras error de validación
         if(Array.isArray(previos) && previos.length){

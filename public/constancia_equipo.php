@@ -51,7 +51,14 @@ $tecnicos = $pdo->query(
 $mensajeOk = null;
 $error = null;
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $puedeEditar) {
+// Los tickets cerrados/cancelados quedan congelados: la constancia ya no se puede modificar.
+$ticketTerminalConst = in_array($ticket['estado'], ['cerrado', 'cancelado'], true);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $puedeEditar && $ticketTerminalConst) {
+    $error = 'Este ticket está "' . str_replace('_', ' ', $ticket['estado']) . '". La constancia ya quedó cerrada y no se puede modificar.';
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $puedeEditar && !$ticketTerminalConst) {
     $datos = [
         'ticket_id'                    => $ticketId,
         'equipo_tipo'                   => trim($_POST['equipo_tipo'] ?? ''),
@@ -62,32 +69,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $puedeEditar) {
         'usuario_id'                    => $usuario['id'],
     ];
 
+    // Valores por defecto para que el INSERT siempre tenga todos los parámetros,
+    // incluso cuando es técnico asignado (que no edita entrega/asignación).
+    $datos['entrega_fecha'] = null;
+    $datos['entrega_estado_equipo'] = '';
+    $datos['entrega_nombre_escuela'] = '';
+    $datos['entrega_cargo_escuela'] = '';
+    $datos['entrega_nombre_receptor'] = '';
+    $datos['asignacion_fecha'] = null;
+    $datos['asignacion_nombre_tecnico'] = '';
+    $datos['asignacion_observaciones'] = '';
+
     // Agregar campos de entrega y asignación solo si NO es técnico
     if (!$esTecnicoAsignado) {
-        $datos['entrega_fecha']                 => $_POST['entrega_fecha'] ?? null,
-        $datos['entrega_estado_equipo']         => trim($_POST['entrega_estado_equipo'] ?? ''),
-        $datos['entrega_nombre_escuela']        => trim($_POST['entrega_nombre_escuela'] ?? ''),
-        $datos['entrega_cargo_escuela']         => trim($_POST['entrega_cargo_escuela'] ?? ''),
-        $datos['entrega_nombre_receptor']       => trim($_POST['entrega_nombre_receptor'] ?? '');
+        $datos['entrega_fecha'] = $_POST['entrega_fecha'] ?? null;
+        $datos['entrega_estado_equipo'] = trim($_POST['entrega_estado_equipo'] ?? '');
+        $datos['entrega_nombre_escuela'] = trim($_POST['entrega_nombre_escuela'] ?? '');
+        $datos['entrega_cargo_escuela'] = trim($_POST['entrega_cargo_escuela'] ?? '');
+        $datos['entrega_nombre_receptor'] = trim($_POST['entrega_nombre_receptor'] ?? '');
 
-        $datos['asignacion_fecha']              => $_POST['asignacion_fecha'] ?? null,
-        $datos['asignacion_nombre_tecnico']     => trim($_POST['asignacion_nombre_tecnico'] ?? ''),
-        $datos['asignacion_observaciones']      => trim($_POST['asignacion_observaciones'] ?? '');
+        $datos['asignacion_fecha'] = $_POST['asignacion_fecha'] ?? null;
+        $datos['asignacion_nombre_tecnico'] = trim($_POST['asignacion_nombre_tecnico'] ?? '');
+        $datos['asignacion_observaciones'] = trim($_POST['asignacion_observaciones'] ?? '');
     }
 
     // Siempre incluir resolucion y devolución (para técnicos también)
-    $datos['resolucion_fecha']              => $_POST['resolucion_fecha'] ?? null,
-    $datos['resolucion_trabajo_realizado']  => trim($_POST['resolucion_trabajo_realizado'] ?? ''),
-    $datos['resolucion_estado_equipo']      => trim($_POST['resolucion_estado_equipo'] ?? ''),
+    $datos['resolucion_fecha'] = $_POST['resolucion_fecha'] ?? null;
+    $datos['resolucion_trabajo_realizado'] = trim($_POST['resolucion_trabajo_realizado'] ?? '');
+    $datos['resolucion_estado_equipo'] = trim($_POST['resolucion_estado_equipo'] ?? '');
 
-    $datos['devolucion_fecha']              => $_POST['devolucion_fecha'] ?? null,
-    $datos['devolucion_nombre_tecnico']     => trim($_POST['devolucion_nombre_tecnico'] ?? ''),
-    $datos['devolucion_estado_equipo']      => trim($_POST['devolucion_estado_equipo'] ?? ''),
-    $datos['devolucion_nombre_escuela']     => trim($_POST['devolucion_nombre_escuela'] ?? ''),
-    $datos['devolucion_cargo_escuela']      => trim($_POST['devolucion_cargo_escuela'] ?? ''),
-    ;
+    $datos['devolucion_fecha'] = $_POST['devolucion_fecha'] ?? null;
+    $datos['devolucion_nombre_tecnico'] = trim($_POST['devolucion_nombre_tecnico'] ?? '');
+    $datos['devolucion_estado_equipo'] = trim($_POST['devolucion_estado_equipo'] ?? '');
+    $datos['devolucion_nombre_escuela'] = trim($_POST['devolucion_nombre_escuela'] ?? '');
+    $datos['devolucion_cargo_escuela'] = trim($_POST['devolucion_cargo_escuela'] ?? '');
     foreach (['entrega_fecha', 'asignacion_fecha', 'resolucion_fecha', 'devolucion_fecha'] as $campoFecha) {
-        $datos[$campoFecha] = $datos[$campoFecha] !== '' ? str_replace('T', ' ', $datos[$campoFecha]) : null;
+        $valorFecha = $datos[$campoFecha] ?? null;
+        $datos[$campoFecha] = ($valorFecha !== null && $valorFecha !== '') ? str_replace('T', ' ', $valorFecha) : null;
     }
 
     $pdo->prepare(
@@ -364,7 +382,11 @@ $etapasParaTecnico = $esTecnicoAsignado
     <?php endif; ?>
 </div>
 
-<?php if (!$puedeEditar): ?>
+<?php if ($ticketTerminalConst): ?>
+    <div class="tarjeta">
+        <p class="texto-secundario">Este ticket está en estado "<?= e(str_replace('_', ' ', $ticket['estado'])) ?>" y la constancia ya quedó cerrada: no se puede modificar. Podés descargarla en PDF como registro.</p>
+    </div>
+<?php elseif (!$puedeEditar): ?>
     <div class="tarjeta">
         <p class="texto-secundario">Solo podés consultar e imprimir esta constancia. La completan el técnico, el coordinador o el administrador.</p>
     </div>

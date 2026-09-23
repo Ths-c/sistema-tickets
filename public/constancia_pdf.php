@@ -7,6 +7,69 @@
 require_once __DIR__ . '/../config/sesion.php';
 requerirLogin();
 require_once __DIR__ . '/../lib/fpdf.php';
+require_once __DIR__ . '/../lib/pdf_texto.php';
+
+// Conversión automática UTF-8 → Latin1 en toda salida de texto
+// (las fuentes core de FPDF solo renderizan Latin1).
+class ConstanciaPDF extends FPDF
+{
+    /**
+     * Cuando MultiCell()/Write() ya convirtieron el texto, las llamadas
+     * internas que FPDF hace a $this->Cell() no deben reconvertirlo
+     * (la doble conversión UTF-8→Latin1 rompe los acentos y muestra '?').
+     */
+    protected bool $textoYaConvertido = false;
+
+    function Cell($w, $h = 0, $txt = '', $border = 0, $ln = 0, $align = '', $fill = false, $link = '')
+    {
+        $t = $this->textoYaConvertido ? (string) $txt : pdfTextoLatin1($txt);
+        parent::Cell($w, $h, $t, $border, $ln, $align, $fill, $link);
+    }
+
+    function MultiCell($w, $h, $txt, $border = 0, $align = 'J', $fill = false)
+    {
+        $this->textoYaConvertido = true;
+        try {
+            parent::MultiCell($w, $h, pdfTextoLatin1($txt), $border, $align, $fill);
+        } finally {
+            $this->textoYaConvertido = false;
+        }
+    }
+
+    function Write($h, $txt, $link = '')
+    {
+        $this->textoYaConvertido = true;
+        try {
+            parent::Write($h, pdfTextoLatin1($txt), $link);
+        } finally {
+            $this->textoYaConvertido = false;
+        }
+    }
+
+    function Text($x, $y, $txt)
+    {
+        parent::Text($x, $y, pdfTextoLatin1($txt));
+    }
+
+    /** True si un bloque de $altura mm ya no entra en la página actual. */
+    function bloqueNoEntra(float $altura): bool
+    {
+        return $this->GetY() + $altura > $this->PageBreakTrigger;
+    }
+
+    /** Altura estimada que ocupará un MultiCell($w, $h, $txt): sirve para evitar cortes. */
+    function alturaMultiCell(float $w, float $h, string $txt): float
+    {
+        $txt = pdfTextoLatin1($txt);
+        if ($w == 0) $w = $this->w - $this->rMargin - $this->x;
+        $usable = max(1, $w - 2 * $this->cMargin);
+        $lineas = 0;
+        foreach (explode("\n", $txt) as $parrafo) {
+            $lineas += max(1, (int) ceil($this->GetStringWidth($parrafo) / $usable));
+        }
+        return $lineas * $h;
+    }
+}
 
 $usuario  = usuarioActual();
 $pdo      = obtenerConexion();
@@ -54,7 +117,7 @@ try {
 }
 
 // ── PDF ─────────────────────────────────────────────────────
-$pdf = new FPDF('P','mm','A4');
+$pdf = new ConstanciaPDF('P','mm','A4');
 $pdf->SetMargins(18,18,18);
 $pdf->SetAutoPageBreak(true, 20);
 $pdf->AddPage();
@@ -72,17 +135,20 @@ $pdf->Cell(0, 5, 'CESDE - Centro de Soporte Digital Educativo', 0, 1, 'C');
 $pdf->SetTextColor(15,23,42);
 $pdf->SetY(30);
 
-// Nro de ticket y datos básicos
+// Nro de ticket y datos básicos (MultiCell: títulos largos no se cortan)
 $pdf->SetFont('Helvetica','B', 10);
-$pdf->Cell(0, 7, 'Ticket N° '.$ticket['id'].'  —  '.$ticket['titulo'], 0, 1, 'C');
+$pdf->MultiCell(0, 7, 'Ticket N° '.$ticket['id'].'  —  '.$ticket['titulo'], 0, 'C');
 $pdf->SetFont('Helvetica','', 9);
 $pdf->SetTextColor(71,85,105);
-$pdf->Cell(0, 5, 'Escuela: '.$ticket['escuela_nombre'].' ('.$ticket['escuela_localidad'].')  |  Categoria: '.$ticket['categoria_nombre'], 0, 1, 'C');
+$pdf->MultiCell(0, 5, 'Escuela: '.$ticket['escuela_nombre'].' ('.$ticket['escuela_localidad'].')  |  Categoria: '.$ticket['categoria_nombre'], 0, 'C');
 $pdf->SetTextColor(15,23,42);
 $pdf->Ln(3);
 
-// Helper: campo con línea
+// Helper: campo con línea (el valor usa MultiCell: textos largos hacen wrap, no se cortan)
 $campoLinea = function(string $label, string $valor) use ($pdf): void {
+    $pdf->SetFont('Helvetica','', 10);
+    $hValor = $pdf->alturaMultiCell(0, 7, '  '.($valor !== '' ? $valor : ' '));
+    if ($pdf->bloqueNoEntra(4 + $hValor)) $pdf->AddPage();
     $pdf->SetFont('Helvetica','B', 8);
     $pdf->SetTextColor(71,85,105);
     $pdf->Cell(0, 4, strtoupper($label), 0, 1);
@@ -90,11 +156,16 @@ $campoLinea = function(string $label, string $valor) use ($pdf): void {
     $pdf->SetTextColor(15,23,42);
     $valorMostrar = $valor !== '' ? $valor : ' ';
     $pdf->SetFillColor(248,250,252);
-    $pdf->Cell(0, 7, '  '.$valorMostrar, 'B', 1, 'L', true);
+    $pdf->MultiCell(0, 7, '  '.$valorMostrar, 'B', 'L', true);
     $pdf->Ln(2);
 };
 
 $campoDoble = function(string $l1, string $v1, string $l2, string $v2) use ($pdf): void {
+    $pdf->SetFont('Helvetica','', 10);
+    $t1 = '  '.($v1 !== '' ? $v1 : ' ');
+    $t2 = '  '.($v2 !== '' ? $v2 : ' ');
+    $hMax = max($pdf->alturaMultiCell(84, 7, $t1), $pdf->alturaMultiCell(84, 7, $t2));
+    if ($pdf->bloqueNoEntra(4 + $hMax)) $pdf->AddPage();
     $pdf->SetFont('Helvetica','B', 8);
     $pdf->SetTextColor(71,85,105);
     $pdf->Cell(84, 4, strtoupper($l1), 0, 0);
@@ -103,15 +174,21 @@ $campoDoble = function(string $l1, string $v1, string $l2, string $v2) use ($pdf
     $pdf->SetFont('Helvetica','', 10);
     $pdf->SetTextColor(15,23,42);
     $pdf->SetFillColor(248,250,252);
-    $pdf->Cell(84, 7, '  '.($v1?:' '), 'B', 0, 'L', true);
-    $pdf->Cell(4, 7, '', 0, 0);
-    $pdf->Cell(84, 7, '  '.($v2?:' '), 'B', 1, 'L', true);
+    $x0 = $pdf->GetX();
+    $y0 = $pdf->GetY();
+    $pdf->SetXY($x0, $y0);
+    $pdf->MultiCell(84, 7, $t1, 'B', 'L', true);
+    $y1 = $pdf->GetY();
+    $pdf->SetXY($x0 + 88, $y0);
+    $pdf->MultiCell(84, 7, $t2, 'B', 'L', true);
+    $pdf->SetY(max($y1, $pdf->GetY()));
     $pdf->Ln(2);
 };
 
-// Sección separadora
+// Sección separadora (no queda huérfana al pie de página)
 $seccion = function(string $titulo, int $num) use ($pdf): void {
     $pdf->Ln(2);
+    if ($pdf->bloqueNoEntra(12)) $pdf->AddPage();
     $pdf->SetFillColor(37,99,235);
     $pdf->SetTextColor(255,255,255);
     $pdf->SetFont('Helvetica','B', 10);
@@ -127,7 +204,7 @@ if (!empty($dispositivosPdf)) {
         $n = $idx + 1;
         $pdf->SetFont('Helvetica','B', 9);
         $pdf->SetTextColor(37,99,235);
-        $pdf->Cell(0, 6, '  Dispositivo '.$n.': '.($d['tipo'] ?? ''), 0, 1, 'L');
+        $pdf->MultiCell(0, 6, '  Dispositivo '.$n.': '.($d['tipo'] ?? ''), 0, 'L');
         $pdf->SetTextColor(15,23,42);
         $campoDoble('Marca / Modelo (Disp. '.$n.')', $d['marca_modelo'] ?? '', 'N° serie / Inventario (Disp. '.$n.')', $d['numero_serie'] ?? '');
         if (!empty($d['descripcion'])) {
@@ -150,6 +227,8 @@ $campoDoble('Nombre y apellido (quien entrega, escuela)', $v('entrega_nombre_esc
 $campoLinea('Quien recibe (por el proyecto)', $v('entrega_nombre_receptor'));
 
 $pdf->Ln(4);
+// El bloque de firmas necesita ~37mm: si no entra, pasa entero a la página siguiente.
+if ($pdf->bloqueNoEntra(37)) $pdf->AddPage();
 $y = $pdf->GetY();
 $pdf->SetDrawColor(15,23,42);
 $pdf->Line(18, $y+18, 90, $y+18);
@@ -166,6 +245,8 @@ $campoDoble('Fecha y hora de asignacion', $fmtFecha($v('asignacion_fecha') ?: nu
 $campoLinea('Observaciones', $v('asignacion_observaciones') ?: '');
 
 $pdf->Ln(4);
+// El bloque de firmas necesita ~37mm: si no entra, pasa entero a la página siguiente.
+if ($pdf->bloqueNoEntra(37)) $pdf->AddPage();
 $y = $pdf->GetY();
 $pdf->SetDrawColor(15,23,42);
 $pdf->Line(53, $y+18, 155, $y+18);
@@ -189,6 +270,8 @@ $campoDoble('Nombre y apellido (quien recibe, escuela)', $v('devolucion_nombre_e
 
 // Espacio de firmas devolución
 $pdf->Ln(4);
+// El bloque de firmas necesita ~37mm: si no entra, pasa entero a la página siguiente.
+if ($pdf->bloqueNoEntra(37)) $pdf->AddPage();
 $y = $pdf->GetY();
 $pdf->SetDrawColor(15,23,42);
 $pdf->Line(18, $y+18, 90, $y+18);

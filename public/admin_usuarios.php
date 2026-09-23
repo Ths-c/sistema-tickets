@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'crear
     $anioCurso = trim($_POST['anio_curso'] ?? '') ?: null;
     $passwordInicial = $_POST['password'] ?? '';
 
-    $rolesValidos = ['admin', 'coordinador', 'tecnico', 'solicitante'];
+    $rolesValidos = ['admin', 'coordinador', 'tecnico', 'solicitante', 'lector'];
 
     if ($nombre === '' || $apellido === '' || !in_array($rol, $rolesValidos, true) || strlen($passwordInicial) < 8) {
         $error = 'Completá nombre, apellido y rol. La contraseña debe tener al menos 8 caracteres.';
@@ -123,10 +123,13 @@ require __DIR__ . '/../includes/header.php';
                     document.getElementById('campo_anio').style.display = this.value === 'tecnico' ? 'block' : 'none';
                     document.getElementById('campo_escuela').style.display = (this.value === 'admin' || this.value === 'coordinador') ? 'none' : 'block';
                 ">
-                    <option value="solicitante">Solicitante (docente/directivo)</option>
-                    <option value="tecnico">Técnico (alumno CESDE)</option>
-                    <option value="coordinador">Coordinador</option>
-                    <option value="admin">Administrador</option>
+                    <option value="">Seleccioná un rol</option>
+
+                    <?php foreach ($rolesValidos as $rol): ?>
+                        <option value="<?= e($rol) ?>">
+                            <?= e(ucfirst($rol)) ?>
+                        </option>
+                    <?php endforeach; ?>
                 </select>
             </div>
             <div id="campo_escuela">

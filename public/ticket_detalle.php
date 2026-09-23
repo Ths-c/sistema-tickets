@@ -159,7 +159,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($accion === 'cambiar_prioridad' && in_array($usuario['rol'], ['admin', 'coordinador'], true)) {
         $nuevaPrioridad = $_POST['prioridad'] ?? '';
         $prioridadesValidas = ['baja', 'media', 'alta', 'urgente'];
-        if (!in_array($nuevaPrioridad, $prioridadesValidas, true)) {
+        if (in_array($ticket['estado'], ['cerrado', 'cancelado'], true)) {
+            $error = 'Este ticket está "' . str_replace('_', ' ', $ticket['estado']) . '" y ya no se puede cambiar la prioridad.';
+        } elseif (!in_array($nuevaPrioridad, $prioridadesValidas, true)) {
             $error = 'Prioridad inválida.';
         } elseif ($nuevaPrioridad === $ticket['prioridad']) {
             $error = 'Esa ya es la prioridad actual.';
@@ -216,8 +218,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Subir un archivo adjunto (captura de pantalla, foto del equipo, etc.)
+    // Bloqueado en tickets cerrados/cancelados: quedan congelados.
     if ($accion === 'subir_adjunto') {
-        if (empty($_FILES['archivo']) || $_FILES['archivo']['error'] === UPLOAD_ERR_NO_FILE) {
+        if (in_array($ticket['estado'], ['cerrado', 'cancelado'], true)) {
+            $error = 'Este ticket está "' . str_replace('_', ' ', $ticket['estado']) . '" y ya no admite archivos adjuntos.';
+        } elseif (empty($_FILES['archivo']) || $_FILES['archivo']['error'] === UPLOAD_ERR_NO_FILE) {
             $error = 'Elegí un archivo para subir.';
         } elseif ($_FILES['archivo']['error'] !== UPLOAD_ERR_OK) {
             $error = 'Hubo un problema al subir el archivo.';
@@ -263,7 +268,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    if ($accion === 'comentar') {
+    // Comentarios bloqueados en tickets cerrados/cancelados: quedan congelados.
+    if ($accion === 'comentar' && in_array($ticket['estado'], ['cerrado', 'cancelado'], true)) {
+        $error = 'Este ticket está "' . str_replace('_', ' ', $ticket['estado']) . '" y ya no admite comentarios.';
+    }
+
+    if ($accion === 'comentar' && !in_array($ticket['estado'], ['cerrado', 'cancelado'], true)) {
         $texto = trim($_POST['comentario'] ?? '');
         $visibilidad = ($_POST['visibilidad'] ?? 'publico') === 'interno' && $usuario['rol'] !== 'solicitante'
             ? 'interno' : 'publico';
@@ -279,13 +289,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // ── Gestión de dispositivos (límite de 2 por ticket) ──
+    // ── Gestión de dispositivos: solo editable mientras el ticket está en estado "nuevo" ──
+    // Una vez que el ticket avanza (asignado, en_proceso, etc.) los dispositivos
+    // quedan fijados a los cargados al crearlo, para no alterar el acta/constancia.
     if ($accion === 'agregar_dispositivo') {
         $puedeGestionar = $esAdmin || in_array($usuario['rol'], ['coordinador'], true) || $ticket['solicitante_id'] === $usuario['id'];
         if (!$puedeGestionar) {
             $error = 'No tenés permiso para agregar dispositivos a este ticket.';
-        } elseif (in_array($ticket['estado'], ['cerrado', 'cancelado'], true)) {
-            $error = 'No se pueden agregar dispositivos a un ticket cerrado o cancelado.';
+        } elseif ($ticket['estado'] !== 'nuevo') {
+            $error = 'Solo se pueden agregar dispositivos mientras el ticket está en estado Nuevo. Una vez que avanza, los dispositivos quedan fijados a los cargados al crearlo.';
         } else {
             try {
                 $limiteDisp = limiteDispositivosPorTicket($pdo);
@@ -328,8 +340,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $puedeGestionar = $esAdmin || in_array($usuario['rol'], ['coordinador'], true) || $ticket['solicitante_id'] === $usuario['id'];
         if (!$puedeGestionar) {
             $error = 'No tenés permiso para quitar dispositivos de este ticket.';
-        } elseif (in_array($ticket['estado'], ['cerrado', 'cancelado'], true)) {
-            $error = 'No se pueden quitar dispositivos de un ticket cerrado o cancelado.';
+        } elseif ($ticket['estado'] !== 'nuevo') {
+            $error = 'Solo se pueden quitar dispositivos mientras el ticket está en estado Nuevo. Una vez que avanza, los dispositivos quedan fijados a los cargados al crearlo.';
         } else {
             $dispId = (int) ($_POST['dispositivo_id'] ?? 0);
             if ($dispId > 0) {
@@ -401,7 +413,10 @@ try {
 }
 $cantidadDispositivos = count($dispositivos);
 $puedeGestionarDispositivos = $esAdmin || in_array($usuario['rol'], ['coordinador'], true) || $ticket['solicitante_id'] === $usuario['id'];
-$ticketCerradoOCancelado = in_array($ticket['estado'], ['cerrado', 'cancelado'], true);
+// Los dispositivos solo se editan en estado "nuevo": al avanzar el ticket quedan fijados.
+$ticketEditable = ($ticket['estado'] === 'nuevo');
+// Los estados terminales quedan congelados: no admiten adjuntos, comentarios ni cambios de prioridad.
+$ticketTerminal = in_array($ticket['estado'], ['cerrado', 'cancelado'], true);
 
 require __DIR__ . '/../includes/header.php';
 ?>
@@ -417,7 +432,7 @@ require __DIR__ . '/../includes/header.php';
         <h1>#<?= (int) $ticket['id'] ?> · <?= e($ticket['titulo']) ?></h1>
         <span class="etiqueta estado-<?= e($ticket['estado']) ?>"><?= ucfirst(str_replace('_', ' ', $ticket['estado'])) ?></span>
 
-        <?php if (in_array($usuario['rol'], ['admin', 'coordinador'], true)): ?>
+        <?php if (in_array($usuario['rol'], ['admin', 'coordinador'], true) && !$ticketTerminal): ?>
             <form method="post" style="margin:0; display:flex; align-items:center; gap:0.35rem;">
                 <input type="hidden" name="accion" value="cambiar_prioridad">
                 <label for="prioridad" class="texto-3 texto-sm" style="margin:0;">Prioridad:</label>
@@ -510,11 +525,11 @@ require __DIR__ . '/../includes/header.php';
                         <span class="texto-3">Agregado el <?= date('d/m/Y H:i', strtotime($d['fecha_creacion'])) ?></span>
                     </div>
                 </div>
-                <?php if ($puedeGestionarDispositivos && !$ticketCerradoOCancelado): ?>
+                <?php if ($puedeGestionarDispositivos && $ticketEditable): ?>
                     <form method="post" onsubmit="return confirm('¿Quitar este dispositivo del ticket?')" style="margin:0;">
                         <input type="hidden" name="accion" value="eliminar_dispositivo">
                         <input type="hidden" name="dispositivo_id" value="<?= (int)$d['id'] ?>">
-                        <button type="submit" class="boton boton-secundario boton-sm" style="padding:0.25rem 0.6rem; font-size:0.78rem; background:#fff; border-color:var(--rojo); color:var(--rojo);">Quitar</button>
+                        <button type="submit" class="boton boton-secundario boton-sm" style="padding:0.25rem 0.6rem; font-size:0.78rem; background:var(--superficie); border-color:var(--rojo); color:var(--rojo);">Quitar</button>
                     </form>
                 <?php endif; ?>
             </div>
@@ -522,13 +537,13 @@ require __DIR__ . '/../includes/header.php';
         </div>
     <?php endif; ?>
 
-    <?php if ($puedeGestionarDispositivos && !$ticketCerradoOCancelado): ?>
+    <?php if ($puedeGestionarDispositivos && $ticketEditable): ?>
         <?php if ($cantidadDispositivos >= $limiteDispositivos): ?>
             <div class="alerta" style="background:var(--rojo-claro); color:var(--rojo); border:1px solid var(--rojo); font-size:0.88rem; padding:0.6rem 0.85rem; margin:0;">
                 Llegaste al máximo de <?= $limiteDispositivos ?> dispositivos para este ticket. Si necesitás reportar más equipos, creá un ticket nuevo.
             </div>
         <?php else: ?>
-            <form method="post" style="background:#fff; border:1px solid var(--borde); border-radius:8px; padding:1rem;">
+            <form method="post" style="background:var(--superficie); border:1px solid var(--borde); border-radius:8px; padding:1rem;">
                 <input type="hidden" name="accion" value="agregar_dispositivo">
                 <div style="font-weight:650; font-size:0.9rem; margin-bottom:0.6rem;">Agregar dispositivo</div>
                 <div class="grid-2" style="gap:0.75rem;">
@@ -557,8 +572,8 @@ require __DIR__ . '/../includes/header.php';
                 </div>
             </form>
         <?php endif; ?>
-    <?php elseif ($ticketCerradoOCancelado): ?>
-        <p class="texto-3" style="font-size:0.82rem; margin:0;">Este ticket está <?= e($ticket['estado']) ?> y ya no se pueden agregar o quitar dispositivos.</p>
+    <?php elseif (!$ticketEditable): ?>
+        <p class="texto-3" style="font-size:0.82rem; margin:0;">Este ticket está en estado "<?= e(str_replace('_', ' ', $ticket['estado'])) ?>" y ya no se pueden agregar o quitar dispositivos. Los dispositivos quedaron fijados a los cargados al crear el ticket.</p>
     <?php else: ?>
         <p class="texto-3" style="font-size:0.82rem; margin:0;">Solo el solicitante del ticket, coordinadores y administradores pueden gestionar los dispositivos.</p>
     <?php endif; ?>
@@ -776,6 +791,9 @@ require __DIR__ . '/../includes/header.php';
     <?php else: ?>
         <p class="texto-2" style="margin-bottom:0.75rem;">Sin archivos adjuntos todavía.</p>
     <?php endif; ?>
+    <?php if ($ticketTerminal): ?>
+        <p class="texto-3" style="font-size:0.82rem; margin:0;">Este ticket está en estado "<?= e(str_replace('_', ' ', $ticket['estado'])) ?>" y ya no admite archivos adjuntos.</p>
+    <?php else: ?>
     <form method="post" enctype="multipart/form-data">
         <input type="hidden" name="accion" value="subir_adjunto">
         <label for="archivo" class="mt-0" style="margin-top:0.75rem;">
@@ -788,6 +806,7 @@ require __DIR__ . '/../includes/header.php';
             : '.jpg,.jpeg,.png,.gif,.webp,.pdf' ?>">
         <div class="acciones-fila"><button type="submit">Subir adjunto</button></div>
     </form>
+    <?php endif; ?>
 </div>
 
 <!-- Comentarios -->
@@ -809,6 +828,9 @@ require __DIR__ . '/../includes/header.php';
         </div>
     <?php endforeach; ?>
 
+    <?php if ($ticketTerminal): ?>
+        <p class="texto-3" style="font-size:0.82rem; margin:1rem 0 0;">Este ticket está en estado "<?= e(str_replace('_', ' ', $ticket['estado'])) ?>" y ya no admite comentarios.</p>
+    <?php else: ?>
     <form method="post" style="margin-top:1rem;">
         <input type="hidden" name="accion" value="comentar">
         <label for="comentario">Agregar comentario</label>
@@ -822,6 +844,7 @@ require __DIR__ . '/../includes/header.php';
         <?php endif; ?>
         <div class="acciones-fila"><button type="submit">Comentar</button></div>
     </form>
+    <?php endif; ?>
 </div>
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>
