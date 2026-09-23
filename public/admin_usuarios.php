@@ -9,6 +9,8 @@ $mensajeOk = null;
 
 $escuelas = $pdo->query('SELECT id, nombre FROM escuelas ORDER BY nombre')->fetchAll();
 
+$rolesValidos = ['admin', 'coordinador', 'tecnico', 'solicitante', 'lector'];
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'crear') {
     $nombre = trim($_POST['nombre'] ?? '');
     $apellido = trim($_POST['apellido'] ?? '');
@@ -23,8 +25,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'crear
     }
     $anioCurso = trim($_POST['anio_curso'] ?? '') ?: null;
     $passwordInicial = $_POST['password'] ?? '';
-
-    $rolesValidos = ['admin', 'coordinador', 'tecnico', 'solicitante', 'lector'];
 
     if ($nombre === '' || $apellido === '' || !in_array($rol, $rolesValidos, true) || strlen($passwordInicial) < 8) {
         $error = 'Completá nombre, apellido y rol. La contraseña debe tener al menos 8 caracteres.';
@@ -83,11 +83,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'reset
     }
 }
 
-$usuarios = $pdo->query(
+// ── Búsqueda / filtros del listado (híbrida: SQL + refinado JS) ──
+$filtroQ = trim($_GET['q'] ?? '');
+if (mb_strlen($filtroQ) > 100) {
+    $filtroQ = mb_substr($filtroQ, 0, 100);
+}
+$filtroRol = trim($_GET['rol'] ?? '');
+if (!in_array($filtroRol, $rolesValidos, true)) {
+    $filtroRol = '';
+}
+$filtroEscuelaId = (int) ($_GET['escuela_id'] ?? 0);
+
+$condiciones = [];
+$parametros = [];
+if ($filtroQ !== '') {
+    $condiciones[] = "(CONCAT(u.nombre, ' ', u.apellido) LIKE :q OR u.rol LIKE :q OR e.nombre LIKE :q)";
+    $parametros['q'] = '%' . $filtroQ . '%';
+}
+if ($filtroRol !== '') {
+    $condiciones[] = 'u.rol = :rol';
+    $parametros['rol'] = $filtroRol;
+}
+if ($filtroEscuelaId > 0) {
+    $condiciones[] = 'u.escuela_id = :escuela_id';
+    $parametros['escuela_id'] = $filtroEscuelaId;
+}
+$whereUsuarios = $condiciones ? ('WHERE ' . implode(' AND ', $condiciones)) : '';
+
+$stmtUsuarios = $pdo->prepare(
     "SELECT u.*, e.nombre AS escuela_nombre FROM usuarios u
      LEFT JOIN escuelas e ON e.id = u.escuela_id
+     $whereUsuarios
      ORDER BY u.activo DESC, u.rol, u.apellido"
-)->fetchAll();
+);
+$stmtUsuarios->execute($parametros);
+$usuarios = $stmtUsuarios->fetchAll();
+$hayFiltroUsuarios = $filtroQ !== '' || $filtroRol !== '' || $filtroEscuelaId > 0;
 
 require __DIR__ . '/../includes/header.php';
 ?>
@@ -125,9 +156,9 @@ require __DIR__ . '/../includes/header.php';
                 ">
                     <option value="">Seleccioná un rol</option>
 
-                    <?php foreach ($rolesValidos as $rol): ?>
-                        <option value="<?= e($rol) ?>">
-                            <?= e(ucfirst($rol)) ?>
+                    <?php foreach ($rolesValidos as $rolOpt): ?>
+                        <option value="<?= e($rolOpt) ?>">
+                            <?= e(ucfirst($rolOpt)) ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -154,7 +185,13 @@ require __DIR__ . '/../includes/header.php';
         </div>
 
         <label for="password">Contraseña inicial</label>
-        <input type="password" id="password" name="password" required minlength="8" placeholder="Mínimo 8 caracteres">
+        <div class="campo-password">
+            <input type="password" id="password" name="password" required minlength="8" placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+            <button type="button" class="btn-mostrar-password" data-toggle-password="password" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña" tabindex="0">
+                <svg class="icono-ojo" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="icono-ojo-off" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.53 9.53a3 3 0 1 0 4.95 3.95"/><path d="M1 1l22 22"/><path d="M10.58 8.59A10.07 10.07 0 0 1 12 4c7 0 11 8 11 8a18.45 18.45 0 0 1-2.16 3.19"/></svg>
+            </button>
+        </div>
 
         <button type="submit">Crear usuario</button>
     </form>
@@ -162,11 +199,53 @@ require __DIR__ . '/../includes/header.php';
 
 <div class="tarjeta">
     <h2>Listado</h2>
-    <table>
+    <form method="get" class="form-filtros" role="search" aria-label="Buscar usuarios">
+        <div style="flex:2; min-width:220px;">
+            <label for="q">Buscar</label>
+            <input type="text" id="q" name="q" value="<?= e($filtroQ) ?>"
+                   placeholder="Nombre, rol o escuela…" autocomplete="off">
+        </div>
+        <div>
+            <label for="filtro_rol">Rol</label>
+            <select id="filtro_rol" name="rol">
+                <option value="">Todos</option>
+                <?php foreach ($rolesValidos as $rolOpt): ?>
+                    <option value="<?= e($rolOpt) ?>" <?= $filtroRol === $rolOpt ? 'selected' : '' ?>>
+                        <?= e(ucfirst($rolOpt)) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
+            <label for="filtro_escuela">Escuela</label>
+            <select id="filtro_escuela" name="escuela_id">
+                <option value="0">Todas</option>
+                <?php foreach ($escuelas as $esc): ?>
+                    <option value="<?= (int) $esc['id'] ?>" <?= $filtroEscuelaId === (int) $esc['id'] ? 'selected' : '' ?>>
+                        <?= e($esc['nombre']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="form-filtros-acciones">
+            <button type="submit" class="boton-sm">Buscar</button>
+            <?php if ($hayFiltroUsuarios): ?>
+                <a href="admin_usuarios.php" class="boton boton-secundario boton-sm">Limpiar</a>
+            <?php endif; ?>
+        </div>
+    </form>
+    <p class="texto-2" id="conteoUsuarios" style="margin:0.75rem 0 0;">
+        <?= count($usuarios) ?> resultado(s)<?= $hayFiltroUsuarios ? ' para el filtro aplicado' : '' ?>.
+    </p>
+    <?php if (!$usuarios): ?>
+        <p class="texto-secundario" style="margin-top:0.75rem;">No hay usuarios que coincidan con la búsqueda.</p>
+    <?php else: ?>
+    <div class="tabla-wrap" style="margin-top:0.75rem;"><table id="tablaUsuarios">
         <thead><tr><th>Nombre</th><th>DNI</th><th>Email</th><th>Rol</th><th>Escuela</th><th>Estado</th><th></th></tr></thead>
-        <tbody>
+        <tbody id="cuerpoUsuarios">
         <?php foreach ($usuarios as $u): ?>
-            <tr>
+            <?php $textoBusqueda = mb_strtolower($u['nombre'] . ' ' . $u['apellido'] . ' ' . $u['rol'] . ' ' . ($u['escuela_nombre'] ?? ''), 'UTF-8'); ?>
+            <tr data-busqueda="<?= e($textoBusqueda) ?>">
                 <td><?= e($u['nombre'] . ' ' . $u['apellido']) ?><?= $u['anio_curso'] ? ' (' . e($u['anio_curso']) . ')' : '' ?></td>
                 <td><?= e($u['dni']) ?></td>
                 <td><?= e($u['email'] ?? '—') ?></td>
@@ -194,7 +273,9 @@ require __DIR__ . '/../includes/header.php';
             </tr>
         <?php endforeach; ?>
         </tbody>
-    </table>
+    </table></div>
+    <p class="texto-secundario" id="sinCoincidencias" style="display:none; margin-top:0.75rem;">Sin coincidencias en esta vista. Probá con otro texto o presioná Buscar.</p>
+    <?php endif; ?>
 </div>
 
 <div id="resetOverlay" class="reset-overlay" hidden>
@@ -218,11 +299,23 @@ require __DIR__ . '/../includes/header.php';
                 </div>
             </div>
             <label for="nueva_password">Nueva contraseña</label>
-            <input type="password" id="nueva_password" name="nueva_password" required minlength="8"
-                   placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+            <div class="campo-password">
+                <input type="password" id="nueva_password" name="nueva_password" required minlength="8"
+                       placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+                <button type="button" class="btn-mostrar-password" data-toggle-password="nueva_password" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña" tabindex="0">
+                    <svg class="icono-ojo" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg class="icono-ojo-off" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.53 9.53a3 3 0 1 0 4.95 3.95"/><path d="M1 1l22 22"/><path d="M10.58 8.59A10.07 10.07 0 0 1 12 4c7 0 11 8 11 8a18.45 18.45 0 0 1-2.16 3.19"/></svg>
+                </button>
+            </div>
             <label for="confirmar_password">Repetir nueva contraseña</label>
-            <input type="password" id="confirmar_password" name="confirmar_password" required minlength="8"
-                   placeholder="Repetila para confirmar" autocomplete="new-password">
+            <div class="campo-password">
+                <input type="password" id="confirmar_password" name="confirmar_password" required minlength="8"
+                       placeholder="Repetila para confirmar" autocomplete="new-password">
+                <button type="button" class="btn-mostrar-password" data-toggle-password="confirmar_password" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña" tabindex="0">
+                    <svg class="icono-ojo" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg class="icono-ojo-off" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.53 9.53a3 3 0 1 0 4.95 3.95"/><path d="M1 1l22 22"/><path d="M10.58 8.59A10.07 10.07 0 0 1 12 4c7 0 11 8 11 8a18.45 18.45 0 0 1-2.16 3.19"/></svg>
+                </button>
+            </div>
             <p id="resetCoincide" class="reset-modal-error">
                 ⚠ Las contraseñas no coinciden.
             </p>
@@ -236,6 +329,26 @@ require __DIR__ . '/../includes/header.php';
 
 <script>
 (function() {
+    // ── Mostrar / ocultar contraseña (crear + reset) ──
+    document.querySelectorAll('[data-toggle-password]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var input = document.getElementById(btn.getAttribute('data-toggle-password'));
+            if (!input) return;
+            var mostrar = input.type === 'password';
+            input.type = mostrar ? 'text' : 'password';
+            btn.setAttribute('aria-label', mostrar ? 'Ocultar contraseña' : 'Mostrar contraseña');
+            btn.setAttribute('aria-pressed', mostrar ? 'true' : 'false');
+            btn.setAttribute('title', mostrar ? 'Ocultar contraseña' : 'Mostrar contraseña');
+            var ojo = btn.querySelector('.icono-ojo');
+            var ojoOff = btn.querySelector('.icono-ojo-off');
+            if (ojo && ojoOff) {
+                ojo.style.display = mostrar ? 'none' : 'block';
+                ojoOff.style.display = mostrar ? 'block' : 'none';
+            }
+            input.focus();
+        });
+    });
+
     var overlay = document.getElementById('resetOverlay');
     var form = document.getElementById('formReset');
     var inputId = document.getElementById('resetUsuarioId');
@@ -253,11 +366,29 @@ require __DIR__ . '/../includes/header.php';
         }).join('') || '—';
     }
 
+    function ocultarPasswordsModal() {
+        [nueva, confirmar].forEach(function(input) {
+            if (input) input.type = 'password';
+        });
+        overlay.querySelectorAll('[data-toggle-password]').forEach(function(btn) {
+            btn.setAttribute('aria-label', 'Mostrar contraseña');
+            btn.setAttribute('aria-pressed', 'false');
+            btn.setAttribute('title', 'Mostrar contraseña');
+            var ojo = btn.querySelector('.icono-ojo');
+            var ojoOff = btn.querySelector('.icono-ojo-off');
+            if (ojo && ojoOff) {
+                ojo.style.display = 'block';
+                ojoOff.style.display = 'none';
+            }
+        });
+    }
+
     function abrir(nombre, id) {
         inputId.value = id;
         spanNombre.textContent = nombre;
         spanAvatar.textContent = iniciales(nombre);
         form.reset();
+        ocultarPasswordsModal();
         aviso.classList.remove('visible');
         nueva.classList.remove('input-error');
         confirmar.classList.remove('input-error');
@@ -270,6 +401,7 @@ require __DIR__ . '/../includes/header.php';
         overlay.hidden = true;
         document.body.style.overflow = '';
         form.reset();
+        ocultarPasswordsModal();
         aviso.classList.remove('visible');
         nueva.classList.remove('input-error');
         confirmar.classList.remove('input-error');
@@ -313,6 +445,31 @@ require __DIR__ . '/../includes/header.php';
             alert('Las contraseñas no coinciden.');
         }
     });
+
+    // ── Búsqueda híbrida: refinado instantáneo sobre lo ya filtrado por SQL ──
+    var inputQ = document.getElementById('q');
+    var cuerpoUsuarios = document.getElementById('cuerpoUsuarios');
+    var conteoUsuarios = document.getElementById('conteoUsuarios');
+    var sinCoincidencias = document.getElementById('sinCoincidencias');
+    var totalServidor = cuerpoUsuarios ? cuerpoUsuarios.querySelectorAll('tr').length : 0;
+    function normalizar(s) {
+        return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+    function filtrarUsuarios() {
+        if (!cuerpoUsuarios || !inputQ) return;
+        var texto = normalizar(inputQ.value.trim());
+        var visibles = 0;
+        cuerpoUsuarios.querySelectorAll('tr').forEach(function(tr) {
+            var hay = !texto || normalizar(tr.getAttribute('data-busqueda')).indexOf(texto) !== -1;
+            tr.style.display = hay ? '' : 'none';
+            if (hay) visibles++;
+        });
+        if (sinCoincidencias) sinCoincidencias.style.display = visibles === 0 ? 'block' : 'none';
+        if (conteoUsuarios) conteoUsuarios.textContent = visibles + ' resultado(s) en vista (de ' + totalServidor + ' del servidor).';
+    }
+    if (inputQ && cuerpoUsuarios) {
+        inputQ.addEventListener('input', filtrarUsuarios);
+    }
 })();
 </script>
 
