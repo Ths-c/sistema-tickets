@@ -738,6 +738,115 @@ button:active, .boton:active { transform: translateY(1px); }
     .pagina-header > div[style*="flex"] { gap: 0.4rem !important; }
 }
 
+/* ================================================================
+   Modal restablecer contraseña (admin_usuarios.php)
+   Overlay fixed + flex: centrado garantizado en viewport,
+   independiente del sidebar y del layout. No usa <dialog>.
+================================================================ */
+.reset-overlay[hidden] { display: none !important; }
+.reset-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgb(15 23 42 / .55);
+    backdrop-filter: blur(2px);
+}
+.reset-modal {
+    width: min(440px, 100%);
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+    background: var(--superficie);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgb(15 23 42 / .3);
+    padding: 1.5rem;
+    animation: panelEntrada 0.18s ease;
+}
+.reset-modal form { margin: 0; }
+.reset-modal-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.reset-modal-titulos h2 { margin: 0; font-size: 1.1rem; }
+.reset-modal-titulos p { font-size: 0.82rem; color: var(--texto-2); margin: 0.15rem 0 0; }
+.reset-modal-icono {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    background: var(--acento-claro);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+.reset-modal-x {
+    margin: 0 0 0 auto;
+    padding: 0;
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: transparent;
+    border: none;
+    color: var(--texto-3);
+    font-size: 0.9rem;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.reset-modal-x:hover { background: var(--fondo); color: var(--texto); box-shadow: none; }
+.reset-modal-usuario {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--fondo);
+    border: 1px solid var(--borde);
+    border-radius: var(--radio);
+    padding: 0.7rem 0.85rem;
+    margin-bottom: 1rem;
+}
+.reset-modal-avatar {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: var(--acento);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    text-transform: uppercase;
+}
+.reset-modal-nombre { font-weight: 650; font-size: 0.9rem; }
+.reset-modal-ayuda { font-size: 0.75rem; color: var(--texto-2); }
+.reset-modal-error {
+    display: none;
+    font-size: 0.8rem;
+    color: var(--rojo);
+    background: var(--rojo-claro);
+    border: 1px solid #fecaca;
+    border-radius: var(--radio);
+    padding: 0.5rem 0.7rem;
+    margin: 0.6rem 0 0;
+}
+.reset-modal-error.visible { display: block; }
+#formReset .input-error { border-color: var(--rojo); }
+#formReset .input-error:focus {
+    border-color: var(--rojo);
+    box-shadow: 0 0 0 3px rgb(220 38 38 / .12);
+}
+.reset-modal-acciones {
+    display: flex;
+    gap: 0.6rem;
+    margin-top: 1.25rem;
+    justify-content: flex-end;
+}
+.reset-modal-acciones button { margin-top: 0; }
+@media (max-width: 480px) {
+    .reset-modal { padding: 1.1rem; }
+    .reset-modal-acciones button { flex: 1; justify-content: center; }
+}
+
 /* Alias de retrocompatibilidad */
 .texto-secundario { color: var(--texto-2); font-size: 0.875rem; }
 

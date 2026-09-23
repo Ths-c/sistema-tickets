@@ -53,6 +53,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'desac
     $mensajeOk = 'Usuario desactivado.';
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'reset_password') {
+    $uid = (int) ($_POST['usuario_id'] ?? 0);
+    $nueva = $_POST['nueva_password'] ?? '';
+    $confirmar = $_POST['confirmar_password'] ?? '';
+
+    if ($uid <= 0) {
+        $error = 'Usuario no válido.';
+    } elseif (strlen($nueva) < 8) {
+        $error = 'La nueva contraseña debe tener al menos 8 caracteres.';
+    } elseif ($nueva !== $confirmar) {
+        $error = 'Las contraseñas no coinciden. Volvé a escribirlas.';
+    } else {
+        $stmtDest = $pdo->prepare('SELECT id, nombre, apellido FROM usuarios WHERE id = :id');
+        $stmtDest->execute(['id' => $uid]);
+        $dest = $stmtDest->fetch();
+        if (!$dest) {
+            $error = 'Usuario no encontrado.';
+        } else {
+            try {
+                $pdo->prepare('UPDATE usuarios SET password_hash = :h WHERE id = :id')
+                    ->execute(['h' => password_hash($nueva, PASSWORD_BCRYPT), 'id' => $uid]);
+                $mensajeOk = 'Contraseña actualizada para ' . $dest['nombre'] . ' ' . $dest['apellido']
+                    . '. Pasale la nueva contraseña por un canal seguro.';
+            } catch (PDOException $ex) {
+                $error = 'No se pudo actualizar la contraseña.';
+            }
+        }
+    }
+}
+
 $usuarios = $pdo->query(
     "SELECT u.*, e.nombre AS escuela_nombre FROM usuarios u
      LEFT JOIN escuelas e ON e.id = u.escuela_id
@@ -141,18 +171,146 @@ require __DIR__ . '/../includes/header.php';
                 <td><?= e($u['escuela_nombre'] ?? '—') ?></td>
                 <td><?= $u['activo'] ? 'Activo' : 'Inactivo' ?></td>
                 <td>
-                    <?php if ($u['activo']): ?>
-                    <form method="post" onsubmit="return confirm('¿Desactivar este usuario?')">
-                        <input type="hidden" name="accion" value="desactivar">
-                        <input type="hidden" name="usuario_id" value="<?= (int) $u['id'] ?>">
-                        <button type="submit" style="margin:0; padding:0.3rem 0.7rem; font-size:0.82rem; background:var(--rojo);">Desactivar</button>
-                    </form>
-                    <?php endif; ?>
+                    <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+                        <button type="button"
+                            class="btn-reset-password"
+                            style="margin:0; padding:0.3rem 0.7rem; font-size:0.82rem; white-space:nowrap;"
+                            data-id="<?= (int) $u['id'] ?>"
+                            data-nombre="<?= e($u['nombre'] . ' ' . $u['apellido']) ?>">
+                            Restablecer contraseña
+                        </button>
+                        <?php if ($u['activo']): ?>
+                        <form method="post" onsubmit="return confirm('¿Desactivar este usuario?')" style="margin:0;">
+                            <input type="hidden" name="accion" value="desactivar">
+                            <input type="hidden" name="usuario_id" value="<?= (int) $u['id'] ?>">
+                            <button type="submit" style="margin:0; padding:0.3rem 0.7rem; font-size:0.82rem; background:var(--rojo);">Desactivar</button>
+                        </form>
+                        <?php endif; ?>
+                    </div>
                 </td>
             </tr>
         <?php endforeach; ?>
         </tbody>
     </table>
 </div>
+
+<div id="resetOverlay" class="reset-overlay" hidden>
+    <div class="reset-modal" role="dialog" aria-modal="true" aria-labelledby="resetTitulo">
+        <form method="post" id="formReset">
+            <input type="hidden" name="accion" value="reset_password">
+            <input type="hidden" name="usuario_id" id="resetUsuarioId" value="">
+            <div class="reset-modal-header">
+                <div class="reset-modal-icono">🔑</div>
+                <div class="reset-modal-titulos">
+                    <h2 id="resetTitulo">Restablecer contraseña</h2>
+                    <p>Se reemplazará la clave actual del usuario.</p>
+                </div>
+                <button type="button" id="btnCerrarReset" class="reset-modal-x" aria-label="Cerrar">✕</button>
+            </div>
+            <div class="reset-modal-usuario">
+                <span class="reset-modal-avatar" id="resetAvatar">—</span>
+                <div>
+                    <div class="reset-modal-nombre" id="resetNombre">—</div>
+                    <div class="reset-modal-ayuda">Pasale la nueva clave por un canal seguro.</div>
+                </div>
+            </div>
+            <label for="nueva_password">Nueva contraseña</label>
+            <input type="password" id="nueva_password" name="nueva_password" required minlength="8"
+                   placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+            <label for="confirmar_password">Repetir nueva contraseña</label>
+            <input type="password" id="confirmar_password" name="confirmar_password" required minlength="8"
+                   placeholder="Repetila para confirmar" autocomplete="new-password">
+            <p id="resetCoincide" class="reset-modal-error">
+                ⚠ Las contraseñas no coinciden.
+            </p>
+            <div class="reset-modal-acciones">
+                <button type="button" id="btnCancelarReset" class="boton-secundario">Cancelar</button>
+                <button type="submit">Guardar contraseña</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+(function() {
+    var overlay = document.getElementById('resetOverlay');
+    var form = document.getElementById('formReset');
+    var inputId = document.getElementById('resetUsuarioId');
+    var spanNombre = document.getElementById('resetNombre');
+    var spanAvatar = document.getElementById('resetAvatar');
+    var nueva = document.getElementById('nueva_password');
+    var confirmar = document.getElementById('confirmar_password');
+    var aviso = document.getElementById('resetCoincide');
+    var btnCancelar = document.getElementById('btnCancelarReset');
+    var btnCerrar = document.getElementById('btnCerrarReset');
+
+    function iniciales(nombre) {
+        return nombre.trim().split(/\s+/).slice(0, 2).map(function(p) {
+            return p.charAt(0).toUpperCase();
+        }).join('') || '—';
+    }
+
+    function abrir(nombre, id) {
+        inputId.value = id;
+        spanNombre.textContent = nombre;
+        spanAvatar.textContent = iniciales(nombre);
+        form.reset();
+        aviso.classList.remove('visible');
+        nueva.classList.remove('input-error');
+        confirmar.classList.remove('input-error');
+        overlay.hidden = false;
+        document.body.style.overflow = 'hidden';
+        nueva.focus();
+    }
+
+    function cerrar() {
+        overlay.hidden = true;
+        document.body.style.overflow = '';
+        form.reset();
+        aviso.classList.remove('visible');
+        nueva.classList.remove('input-error');
+        confirmar.classList.remove('input-error');
+    }
+
+    document.querySelectorAll('.btn-reset-password').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            abrir(btn.dataset.nombre || '—', btn.dataset.id);
+        });
+    });
+
+    btnCancelar.addEventListener('click', cerrar);
+    btnCerrar.addEventListener('click', cerrar);
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) cerrar();
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && !overlay.hidden) cerrar();
+    });
+
+    [nueva, confirmar].forEach(function(el) {
+        el.addEventListener('input', function() {
+            var distinto = nueva.value && confirmar.value && nueva.value !== confirmar.value;
+            aviso.classList.toggle('visible', !!distinto);
+            nueva.classList.toggle('input-error', !!distinto);
+            confirmar.classList.toggle('input-error', !!distinto);
+        });
+    });
+
+    form.addEventListener('submit', function(e) {
+        if (nueva.value.length < 8) {
+            e.preventDefault();
+            alert('La nueva contraseña debe tener al menos 8 caracteres.');
+            return;
+        }
+        if (nueva.value !== confirmar.value) {
+            e.preventDefault();
+            aviso.classList.add('visible');
+            nueva.classList.add('input-error');
+            confirmar.classList.add('input-error');
+            alert('Las contraseñas no coinciden.');
+        }
+    });
+})();
+</script>
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>
