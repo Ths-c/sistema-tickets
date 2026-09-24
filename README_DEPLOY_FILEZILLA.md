@@ -5,8 +5,9 @@ Guía para subir `sistema-tickets/` a un hosting Apache + PHP + MySQL
 
 ## 0. Requisitos del hosting
 
-- PHP **8.0 o superior** (el código usa `match`, `str_contains`,
-  `str_starts_with`). Revisalo en cPanel → "Versión PHP".
+- PHP **7.4 o superior** (hay compatibilidad incluida en
+  `lib/compat74.php`; si el hosting ofrece 8.x, mejor todavía).
+  Revisalo en cPanel → "Versión PHP".
 - Extensiones: `pdo_mysql`, `mbstring`, `json`, `fileinfo`, `session`
   (casi todos los hostings las traen activas).
 - 1 base MySQL libre + acceso a phpMyAdmin.

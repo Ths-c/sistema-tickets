@@ -26,12 +26,17 @@ if (!$ticket) {
     die('Ticket no encontrado.');
 }
 
-$puedeVer = match ($usuario['rol']) {
-    'admin', 'coordinador' => true,
-    'solicitante' => $ticket['solicitante_id'] === $usuario['id'],
-    'tecnico'     => $ticket['tecnico_id'] === $usuario['id'],
-    default       => false,
-};
+// (if/elseif con === estricto: equivale al match de PHP 8).
+$rolActual = $usuario['rol'];
+if ($rolActual === 'admin' || $rolActual === 'coordinador') {
+    $puedeVer = true;
+} elseif ($rolActual === 'solicitante') {
+    $puedeVer = $ticket['solicitante_id'] === $usuario['id'];
+} elseif ($rolActual === 'tecnico') {
+    $puedeVer = $ticket['tecnico_id'] === $usuario['id'];
+} else {
+    $puedeVer = false;
+}
 if (!$puedeVer) {
     http_response_code(403);
     die('No tenés permiso para ver esta constancia.');

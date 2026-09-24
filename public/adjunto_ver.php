@@ -20,12 +20,17 @@ if (!$adjunto) {
 }
 
 // Mismo criterio de acceso que en ticket_detalle.php
-$puedeVer = match ($usuario['rol']) {
-    'admin', 'coordinador' => true,
-    'solicitante' => $adjunto['solicitante_id'] === $usuario['id'],
-    'tecnico'     => $adjunto['tecnico_id'] === $usuario['id'],
-    default       => false,
-};
+// (if/elseif con === estricto: equivale al match de PHP 8).
+$rolActual = $usuario['rol'];
+if ($rolActual === 'admin' || $rolActual === 'coordinador') {
+    $puedeVer = true;
+} elseif ($rolActual === 'solicitante') {
+    $puedeVer = $adjunto['solicitante_id'] === $usuario['id'];
+} elseif ($rolActual === 'tecnico') {
+    $puedeVer = $adjunto['tecnico_id'] === $usuario['id'];
+} else {
+    $puedeVer = false;
+}
 if (!$puedeVer) {
     http_response_code(403);
     die('No tenés permiso para ver este archivo.');

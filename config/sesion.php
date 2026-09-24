@@ -138,13 +138,20 @@ function obtenerActaEquipo(PDO $pdo, int $ticketId): ?array
  */
 function camposObligatoriosActa(string $etapa): array
 {
-    return match ($etapa) {
-        'entrega'     => ['entrega_fecha', 'entrega_nombre_escuela', 'entrega_nombre_receptor'],
-        'asignacion'  => ['asignacion_fecha', 'asignacion_nombre_tecnico'],
-        'resolucion'  => ['resolucion_fecha', 'resolucion_trabajo_realizado'],
-        'devolucion'  => ['devolucion_fecha', 'devolucion_nombre_tecnico', 'devolucion_nombre_escuela'],
-        default       => [],
-    };
+    // if/elseif con === estricto (equivale al match de PHP 8).
+    if ($etapa === 'entrega') {
+        return ['entrega_fecha', 'entrega_nombre_escuela', 'entrega_nombre_receptor'];
+    }
+    if ($etapa === 'asignacion') {
+        return ['asignacion_fecha', 'asignacion_nombre_tecnico'];
+    }
+    if ($etapa === 'resolucion') {
+        return ['resolucion_fecha', 'resolucion_trabajo_realizado'];
+    }
+    if ($etapa === 'devolucion') {
+        return ['devolucion_fecha', 'devolucion_nombre_tecnico', 'devolucion_nombre_escuela'];
+    }
+    return [];
 }
 
 /** Indica si una etapa puntual del acta (entrega/asignacion/resolucion/devolucion) está completa. */

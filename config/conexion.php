@@ -1,4 +1,8 @@
 <?php
+// Polyfills PHP 7.4 (str_contains/str_starts_with/str_ends_with).
+// En PHP 8+ no hacen nada: se usan las nativas.
+require_once __DIR__ . '/../lib/compat74.php';
+
 /**
  * Conexión a la base de datos.
  *

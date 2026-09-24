@@ -45,11 +45,14 @@ $limiteDispositivos = limiteDispositivosPorTicket($pdo);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Bloqueo server-side: rechazar aunque hagan POST directo
     if ($soloLectura) {
-        $error = match ($motivoBloqueo) {
-            'escuela' => 'Tu escuela tiene bloqueada la creación de tickets en este momento.',
-            'limite'  => "Tu escuela ya tiene {$ticketsAbiertos} tickets abiertos (el máximo permitido es {$limiteAbiertos}). Esperá a que se cierren o cancelen tickets existentes antes de crear uno nuevo.",
-            default   => 'El sistema está bloqueado. No se pueden crear nuevos tickets en este momento.',
-        };
+        // (if/elseif con === estricto: equivale al match de PHP 8).
+        if ($motivoBloqueo === 'escuela') {
+            $error = 'Tu escuela tiene bloqueada la creación de tickets en este momento.';
+        } elseif ($motivoBloqueo === 'limite') {
+            $error = "Tu escuela ya tiene {$ticketsAbiertos} tickets abiertos (el máximo permitido es {$limiteAbiertos}). Esperá a que se cierren o cancelen tickets existentes antes de crear uno nuevo.";
+        } else {
+            $error = 'El sistema está bloqueado. No se pueden crear nuevos tickets en este momento.';
+        }
     } else {
         $titulo      = trim($_POST['titulo']      ?? '');
         $descripcion = trim($_POST['descripcion'] ?? '');
