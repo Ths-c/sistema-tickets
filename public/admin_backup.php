@@ -33,6 +33,53 @@ function formatoTamano(int $bytes): string {
     return $bytes . ' B';
 }
 
+// ── Saneamiento de dumps: quita del inicio las líneas de ruido que los
+// binarios pueden emitir (ej. "mysqldump: Deprecated program name…") para
+// que el .sql descargado importe directo en phpMyAdmin sin tocar código.
+// Mantenida en sync con admin_backup_descargar.php.
+function sanearContenidoBackup(string $sql): string {
+    $lineas  = preg_split("/\r\n|\n|\r/", $sql);
+    $limpias = [];
+    $empezo  = false;
+    foreach ($lineas as $linea) {
+        if (!$empezo) {
+            $t = trim($linea);
+            if ($t === '') continue;
+            // Aviso pegado al SQL en la misma línea: recortar el aviso y
+            // conservar el resto (ej. "...instead /*M!999999 ... */ -- MariaDB dump ...").
+            if (str_contains($linea, 'Deprecated program name')) {
+                $pos = strpos($linea, '*/');
+                if ($pos !== false) {
+                    $resto = trim(substr($linea, $pos + 2));
+                    if ($resto !== '') {
+                        $limpias[] = $resto;
+                        $empezo = true;
+                    }
+                }
+                continue;
+            }
+            // Otras líneas de ruido de shell al inicio del archivo.
+            if (str_starts_with($t, 'mysqldump:') || str_starts_with($t, 'mariadb-dump:')) continue;
+            if (preg_match('/^(Warning|ERROR \d+|Usage:)/i', $t)) continue;
+            $empezo = true;
+        }
+        $limpias[] = $linea;
+    }
+    return implode("\n", $limpias);
+}
+
+// El contenido es SQL importable: sin avisos y con primera línea útil válida.
+function backupEsValido(string $sql): bool {
+    if (str_contains($sql, 'Deprecated program name')) return false;
+    foreach (preg_split("/\r\n|\n|\r/", $sql) as $linea) {
+        $t = trim($linea);
+        if ($t === '') continue;
+        if (str_starts_with($t, '--') || str_starts_with($t, '/*') || str_starts_with($t, '!')) return true;
+        return (bool) preg_match('/^(SET|CREATE|USE |LOCK|DROP|INSERT|ALTER|DELIMITER)/i', $t);
+    }
+    return false;
+}
+
 // ── Acciones POST ────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $accion = $_POST['accion'] ?? '';
@@ -42,40 +89,121 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $filename  = "backup_{$timestamp}.sql";
         $filepath  = $backupsDir . '/' . $filename;
 
-        // Localizar mysqldump (XAMPP por defecto)
-        $mysqldump = 'mysqldump';
-        foreach (['C:\\xampp\\mysql\\bin\\mysqldump.exe', 'C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysqldump.exe'] as $candidato) {
-            if (is_file($candidato)) { $mysqldump = $candidato; break; }
+        // Localizar el binario de volcado. Se prefiere el propio de XAMPP
+        // (coincide con la versión del servidor y no sufre la contaminación
+        // de LD_LIBRARY_PATH); si no está, el del sistema con entorno saneado.
+        // Se evita el wrapper 'mysqldump' deprecado que ensucia el .sql.
+        $mysqldump = '';
+        foreach (['/opt/lampp/bin/mariadb-dump', '/opt/lampp/bin/mysqldump', 'C:\\xampp\\mysql\\bin\\mysqldump.exe', 'C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysqldump.exe', '/usr/bin/mariadb-dump', '/usr/bin/mysqldump'] as $candidato) {
+            if (is_file($candidato) && is_executable($candidato)) { $mysqldump = $candidato; break; }
+        }
+        if ($mysqldump === '') {
+            // Respaldo: lo que haya en el PATH del servidor web.
+            $cual = trim((string) shell_exec('command -v mariadb-dump 2>/dev/null || command -v mysqldump 2>/dev/null'));
+            if ($cual !== '') $mysqldump = $cual;
+        }
+        // Los binarios del sistema se rompen si heredan el LD_LIBRARY_PATH de
+        // XAMPP (/opt/lampp/lib sin GLIBCXX nuevo): se ejecuta con entorno
+        // limpio. Los de /opt/lampp sí necesitan sus libs, se dejan como están.
+        $envPrefix = ($mysqldump !== '' && !str_starts_with($mysqldump, '/opt/lampp')
+            && !str_contains(strtolower($mysqldump), 'xampp'))
+            ? 'env -u LD_LIBRARY_PATH ' : '';
+
+        // ── Pre-chequeos: fallar con mensaje claro en vez del genérico ──
+        $preError = null;
+        if ($mysqldump === '') {
+            $preError = 'No se encontró mariadb-dump/mysqldump en el servidor.';
+        } elseif (!is_dir($backupsDir) || !is_writable($backupsDir)) {
+            $preError = 'La carpeta backups/ no tiene permiso de escritura para el servidor web. '
+                . 'En local (XAMPP Linux): sudo chown -R daemon ' . e($backupsDir);
+        } elseif (!function_exists('exec')) {
+            $preError = 'La función exec() está deshabilitada en este servidor.';
+        }
+        $stderrTmp = $preError === null ? tempnam(sys_get_temp_dir(), 'backup_err_') : false;
+        if ($preError === null && $stderrTmp === false) {
+            $preError = 'No se pudo crear un archivo temporal en ' . e(sys_get_temp_dir());
         }
 
-        $command = $mysqldump
-            . ' --user='    . escapeshellarg(DB_USER)
-            . ' --password=' . escapeshellarg(DB_PASS)
-            . ' --host='    . escapeshellarg(DB_HOST)
+        if ($preError !== null) {
+            $error = 'No se pudo generar el backup de la base de datos.<br>' . $preError;
+        } else {
+        // stderr va a un temporal aparte: nunca dentro del .sql (eso era lo
+        // que dejaba la línea "Deprecated program name" e impedía importar).
+        // Si la contraseña está vacía se omite el flag (algunos wrappers lo
+        // tratan distinto y pueden colgarse pidiéndola).
+        // Con host local se fuerza TCP (127.0.0.1): el socket por defecto del
+        // sistema (/var/lib/...) no coincide con el de XAMPP y el volcado
+        // fallaría con "Can't connect through socket".
+        $dumpHost = in_array(DB_HOST, ['localhost', '127.0.0.1'], true) ? '127.0.0.1' : DB_HOST;
+        $passFlag = DB_PASS !== '' ? ' --password=' . escapeshellarg(DB_PASS) : '';
+        $flagsBase = ' --user='    . escapeshellarg(DB_USER)
+            . $passFlag
+            . ' --host='    . escapeshellarg($dumpHost)
+            . ' --protocol=TCP'
             . ' --no-tablespaces --routines --triggers'
-            . ' ' . escapeshellarg(DB_NAME)
-            . ' > ' . escapeshellarg($filepath)
-            . ' 2>&1';
-
-        $output    = [];
-        $returnVar = 0;
-        exec($command, $output, $returnVar);
+            . ' ' . escapeshellarg(DB_NAME);
+        // Si el servidor tiene mysql.proc desactualizado (o sin privilegios
+        // para rutinas), el intento con --routines falla: se reintenta sin él.
+        $intentosFlags = [$flagsBase, str_replace(' --routines', '', $flagsBase)];
+        $output = [];
+        $returnVar = 1;
+        $stderr = '';
+        $sinRutinas = false;
+        foreach ($intentosFlags as $i => $flags) {
+            $command = $envPrefix . $mysqldump . $flags
+                . ' > ' . escapeshellarg($filepath)
+                . ' 2> ' . escapeshellarg($stderrTmp);
+            $output    = [];
+            $returnVar = 0;
+            exec($command, $output, $returnVar);
+            $stderr = is_file($stderrTmp) ? (string) file_get_contents($stderrTmp) : '';
+            if ($returnVar === 0 && is_file($filepath) && filesize($filepath) > 0) break;
+            $fallaRutinas = str_contains($stderr, 'mysql.proc')
+                || str_contains($stderr, 'SHOW FUNCTION STATUS')
+                || str_contains($stderr, 'SHOW PROCEDURE STATUS');
+            if ($i === 0 && $fallaRutinas) {
+                $sinRutinas = true;
+                continue;
+            }
+            break;
+        }
+        if (is_file($stderrTmp)) @unlink($stderrTmp);
 
         if ($returnVar === 0 && is_file($filepath) && filesize($filepath) > 0) {
-            $historial = leerHistorial($metaFile);
-            array_unshift($historial, [
-                'archivo' => $filename,
-                'fecha'   => date('Y-m-d H:i:s'),
-                'usuario' => $usuario['nombre'] . ' ' . $usuario['apellido'],
-                'tamano'  => (int) filesize($filepath),
-            ]);
-            guardarHistorial($metaFile, $historial);
-            $ok = 'Backup generado correctamente: <strong>' . e($filename) . '</strong>';
-        } else {
-            $error = 'No se pudo generar el backup de la base de datos.';
-            if (!empty($output)) {
-                $error .= '<br><small style="font-family:monospace;">' . e(implode('<br>', $output)) . '</small>';
+            $contenido = sanearContenidoBackup((string) file_get_contents($filepath));
+            if (!backupEsValido($contenido)) {
+                @unlink($filepath);
+                $error = 'El backup generado no superó la validación de SQL importable y se descartó. Probá de nuevo o avisá al administrador.';
+                if (trim($stderr) !== '') {
+                    $error .= '<br><small style="font-family:monospace;">' . e($stderr) . '</small>';
+                }
+            } else {
+                file_put_contents($filepath, $contenido);
+                $historial = leerHistorial($metaFile);
+                array_unshift($historial, [
+                    'archivo' => $filename,
+                    'fecha'   => date('Y-m-d H:i:s'),
+                    'usuario' => $usuario['nombre'] . ' ' . $usuario['apellido'],
+                    'tamano'  => (int) filesize($filepath),
+                ]);
+                guardarHistorial($metaFile, $historial);
+                $ok = 'Backup generado correctamente: <strong>' . e($filename) . '</strong>';
+                if ($sinRutinas) {
+                    $ok .= '<br><small>Sin rutinas almacenadas (el servidor MySQL necesita mysql_upgrade; tablas y triggers incluidos).</small>';
+                }
             }
+        } else {
+            if (is_file($filepath)) @unlink($filepath);
+            $error = 'No se pudo generar el backup de la base de datos.'
+                . '<br><small style="font-family:monospace;">Binario: ' . e($mysqldump)
+                . ' · retorno: ' . (int) $returnVar . '</small>';
+            $detalle = trim($stderr) !== '' ? $stderr : implode("\n", $output);
+            if (trim($detalle) !== '') {
+                $error .= '<br><small style="font-family:monospace;">' . e($detalle) . '</small>';
+            } elseif ($returnVar !== 0) {
+                $error .= '<br><small style="font-family:monospace;">Sin mensaje del sistema: suele ser permiso de escritura en backups/ o credenciales del volcado.</small>';
+            }
+        }
         }
     }
 
@@ -193,7 +321,7 @@ require __DIR__ . '/../includes/header.php';
 <div class="tarjeta">
     <div class="tarjeta-titulo">Historial de backups</div>
 
-    <?php if ($backups): ?>
+    <?php if ($backups): ?> 
         <div class="tabla-wrap">
         <table>
             <thead>
