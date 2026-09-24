@@ -2,6 +2,16 @@
 -- CESDE - Centro de Soporte Digital Educativo
 -- Centro de Soporte Digital Educativo
 -- =====================================================================
+-- INSTALACIÓN EN HOSTING COMPARTIDO (cPanel + phpMyAdmin):
+--   1. Creá la base desde cPanel ("Bases de datos MySQL") y anotala.
+--   2. Entrá a phpMyAdmin, seleccioná TU base vacía (clic en su nombre).
+--   3. Pestaña "Importar" → elegí este archivo, pero ANTES comentá o borrá
+--      las 2 líneas de abajo (CREATE DATABASE y USE): en hosting no tenés
+--      permiso para crear bases por SQL y la importación fallaría.
+--   4. Después importá, en orden, los archivos sql/migracion_*.sql
+--      (también con tu base seleccionada).
+-- EN LOCAL (XAMPP) se importa tal cual, sin tocar nada.
+-- =====================================================================
 
 CREATE DATABASE IF NOT EXISTS tickets_distrital
   CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

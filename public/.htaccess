@@ -1,0 +1,4 @@
+# Carpeta pública: listados cerrados, UTF-8 por defecto.
+Options -Indexes
+ServerSignature Off
+AddDefaultCharset UTF-8

@@ -249,8 +249,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'El archivo no puede superar los 8 MB.';
             } else {
                 $carpetaDestino = __DIR__ . '/../uploads/adjuntos/';
+                // La carpeta se autocrea si el hosting no la trajo por FTP.
+                if (!is_dir($carpetaDestino)) {
+                    @mkdir($carpetaDestino, 0755, true);
+                }
                 $nombreUnico = 'ticket' . $ticketId . '_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.' . $extension;
-                if (move_uploaded_file($archivo['tmp_name'], $carpetaDestino . $nombreUnico)) {
+                if (!is_dir($carpetaDestino) || !is_writable($carpetaDestino)) {
+                    $error = 'El servidor no tiene permiso de escritura en uploads/adjuntos/. '
+                        . 'En el hosting, dale permiso 755 (o 775) a uploads/ y uploads/adjuntos/ desde el panel o FileZilla.';
+                } elseif (move_uploaded_file($archivo['tmp_name'], $carpetaDestino . $nombreUnico)) {
                     $pdo->prepare(
                         'INSERT INTO adjuntos (ticket_id, nombre_archivo, ruta_archivo, usuario_id)
                          VALUES (:tid, :nombre, :ruta, :uid)'

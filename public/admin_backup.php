@@ -115,7 +115,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $preError = 'No se encontró mariadb-dump/mysqldump en el servidor.';
         } elseif (!is_dir($backupsDir) || !is_writable($backupsDir)) {
             $preError = 'La carpeta backups/ no tiene permiso de escritura para el servidor web. '
-                . 'En local (XAMPP Linux): sudo chown -R daemon ' . e($backupsDir);
+                . 'En local (XAMPP Linux): sudo chown -R daemon ' . e($backupsDir) . '. '
+                . 'En hosting: creá la carpeta backups/ desde el panel/FileZilla y dale permiso 755 (o 775). '
+                . 'Si el hosting no permite exec() ni mysqldump, generá el backup desde phpMyAdmin → Exportar.';
         } elseif (!function_exists('exec')) {
             $preError = 'La función exec() está deshabilitada en este servidor.';
         }

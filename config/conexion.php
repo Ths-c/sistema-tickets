@@ -1,15 +1,37 @@
 <?php
 /**
  * Conexión a la base de datos.
- * En localhost (XAMPP) los valores por defecto ya funcionan.
- * Al subir a un hosting, sobrescribir con variables de entorno o
- * editar directamente estas constantes.
+ *
+ * Prioridad de las credenciales (gana la primera que exista):
+ *   1. Archivo config/conexion.local.php — RECOMENDADO en hosting compartido:
+ *      lo creás una vez por FileZilla/panel con los datos del hosting y no
+ *      tenés que tocar nunca este archivo (ver conexion.local.ejemplo.php).
+ *      Ese archivo NO está en git (ver .gitignore).
+ *   2. Variables de entorno DB_HOST, DB_NAME, DB_USER, DB_PASS
+ *      (para VPS/Docker/hostings que las soportan).
+ *   3. Valores de abajo (tu XAMPP local).
  */
 
-define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
-define('DB_NAME', getenv('DB_NAME') ?: 'tickets_distrital');
-define('DB_USER', getenv('DB_USER') ?: 'root');
-define('DB_PASS', getenv('DB_PASS') ?: '');
+// 1) Override local por archivo (ideal para FTP: sobrevive actualizaciones).
+$__conexionLocal = __DIR__ . '/conexion.local.php';
+if (is_file($__conexionLocal)) {
+    require_once $__conexionLocal;
+}
+
+// 2-3) Entorno o defaults locales. El archivo local manda si ya definió.
+if (!defined('DB_HOST')) {
+    define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
+}
+if (!defined('DB_NAME')) {
+    define('DB_NAME', getenv('DB_NAME') ?: 'tickets_distrital');
+}
+if (!defined('DB_USER')) {
+    define('DB_USER', getenv('DB_USER') ?: 'root');
+}
+if (!defined('DB_PASS')) {
+    define('DB_PASS', getenv('DB_PASS') ?: '');
+}
+unset($__conexionLocal);
 
 function obtenerConexion(): PDO
 {

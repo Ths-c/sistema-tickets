@@ -1,0 +1,15 @@
+# Adjuntos: NUNCA acceso directo por web.
+# Se sirven solo vía public/adjunto_ver.php (con control de login y rol).
+# El PHP sigue leyendo por filesystem (readfile), el Deny solo bloquea HTTP.
+Options -Indexes
+ServerSignature Off
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order deny,allow
+    Deny from all
+</IfModule>
+# Defensa en profundidad: aunque el host ignore el Deny, que nada se ejecute acá.
+php_flag engine off
+AddHandler text/plain .php .phtml .phar .cgi .pl .py

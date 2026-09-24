@@ -1,0 +1,26 @@
+# CESDE - Sistema de tickets
+# Si el dominio apunta a la raíz del proyecto (caso típico en hosting
+# compartido subiendo por FileZilla), redirigir / a /public/.
+Options -Indexes
+ServerSignature Off
+AddDefaultCharset UTF-8
+
+RewriteEngine On
+RewriteRule ^$ public/ [R=302,L]
+
+# Bloqueo global de carpetas sensibles por si algún .htaccess interno
+# no se subió por FTP o el hosting lo ignora parcialmente.
+# (El PHP las sigue usando por filesystem: require/include/readfile.)
+RewriteRule ^(config|includes|lib|sql|backups|uploads|changelog)(/|$) - [F,L]
+RewriteRule ^\.git(/|$) - [F,L]
+
+# Proteger archivos sensibles aunque alguien adivine la ruta.
+<FilesMatch "^(conexion\.local\.php|\.env|\.git.*)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>

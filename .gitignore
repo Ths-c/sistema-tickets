@@ -1,3 +1,21 @@
-# Copias de seguridad de la base de datos (contienen datos sensibles)
+# Copias de seguridad de la base de datos (contienen datos sensibles).
+# Se generan en el servidor: NO subir las locales ni versionarlas.
 backups/*
 !backups/.gitkeep
+!backups/.htaccess
+!backups/index.html
+
+# Credenciales del hosting (ver config/conexion.local.ejemplo.php).
+config/conexion.local.php
+
+# Adjuntos subidos por usuarios: se generan en el servidor.
+# Solo se versionan los archivos de protección de la carpeta.
+uploads/adjuntos/*
+!uploads/adjuntos/.gitkeep
+!uploads/adjuntos/.htaccess
+!uploads/adjuntos/index.html
+
+# Basura de cada SO (aparece al arrastrar carpetas por FileZilla).
+.DS_Store
+Thumbs.db
+desktop.ini

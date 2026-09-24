@@ -1,0 +1,4 @@
+# CSS público: permitir archivos, pero sin listado de directorio.
+Options -Indexes
+ServerSignature Off
+AddDefaultCharset UTF-8
