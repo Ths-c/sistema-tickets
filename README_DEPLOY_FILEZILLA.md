@@ -37,11 +37,9 @@ subcarpeta; en ese caso la URL será
 | Carpetas `backups/` y `uploads/adjuntos/` **vacías** | `sql/LISTADO USUARIOS*.csv` (datos personales) |
 | `config/conexion.local.php` (**lo creás vos**, ver paso 4) | `.git/`, `.writetest_*`, `Thumbs.db`, `.DS_Store` |
 
-> Nota: en tu PC la carpeta local `backups/` pertenece al usuario del
-> servidor (daemon) y puede que no veas ahí su `.htaccess`/`index.html`.
-> No importa: el `.htaccess` de la **raíz** ya bloquea `backups/` por
-> web. Igual, como refuerzo, creá en el servidor (paso 5) el archivo
-> `backups/.htaccess` con el contenido de abajo.
+> Las carpetas `backups/` y `uploads/adjuntos/` ya traen sus
+> `.htaccess`/`index.html` de protección incluidos: solo asegurate de
+> subirlos (ver paso 1, archivos ocultos).
 
 ## 3. Base de datos
 
@@ -66,20 +64,10 @@ subcarpeta; en ese caso la URL será
 1. Carpetas: `755` (`backups/`, `uploads/`, `uploads/adjuntos/`:
    si falla la subida, probá `775`). Archivos: `644`.
    En FileZilla: clic derecho → "Permisos de archivo".
-2. Verificá que existan (si falta alguno, crealo desde el panel):
-   - `backups/.htaccess` y `uploads/adjuntos/.htaccess`
-3. Contenido de `backups/.htaccess` (por si hay que crearlo a mano):
-   ```apache
-   Options -Indexes
-   ServerSignature Off
-   <IfModule mod_authz_core.c>
-       Require all denied
-   </IfModule>
-   <IfModule !mod_authz_core.c>
-       Order deny,allow
-       Deny from all
-   </IfModule>
-   ```
+2. Verificá que se hayan subido los `.htaccess` de
+   `backups/`, `uploads/adjuntos/`, `config/`, `includes/`, `lib/`,
+   `sql/` y `changelog/` (si falta alguno, crealo desde el panel con
+   el contenido de cualquier otro: todos niegan el acceso web).
 
 ## 6. Probar
 
