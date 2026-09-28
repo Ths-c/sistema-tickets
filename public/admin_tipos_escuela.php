@@ -1,15 +1,23 @@
 <?php
 require_once __DIR__ . '/../config/sesion.php';
-requerirRol(['admin']);
+requerirRol(['admin', 'lector']);
 
 $pdo = obtenerConexion();
+// El lector ve lo mismo que el admin pero en solo lectura (sin POST).
+$usuarioActual = usuarioActual();
+$esSoloLectura = esRolSoloLectura($usuarioActual['rol'] ?? '');
 $tituloPagina = 'Tipos de escuela';
 $ok = null;
 $error = null;
 $editando = null;
 
 // ── Acción: guardar (crear o editar) ────────────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// El rol lector es 100% solo lectura: se rechaza cualquier POST aunque lo manden a mano.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $esSoloLectura) {
+    $error = 'El rol lector es de solo visualización y no puede realizar acciones.';
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$esSoloLectura) {
     $accion      = $_POST['accion'] ?? '';
     $nombre      = trim($_POST['nombre'] ?? '');
     $descripcion = trim($_POST['descripcion'] ?? '');
@@ -47,6 +55,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // ── Cargar para editar ───────────────────────────────────────
 $editId = (int) ($_GET['editar'] ?? 0);
+if ($editId > 0 && $esSoloLectura) {
+    // En modo lector no hay edición: se ignora el parámetro.
+    $editId = 0;
+}
 if ($editId > 0) {
     $stmt = $pdo->prepare('SELECT * FROM tipos_escuela WHERE id=:id');
     $stmt->execute(['id' => $editId]);
@@ -71,7 +83,11 @@ require __DIR__ . '/../includes/header.php';
     <!-- Formulario crear / editar -->
     <div class="tarjeta">
         <div class="tarjeta-titulo"><?= $editando ? 'Editar tipo' : 'Nuevo tipo' ?></div>
+        <?php if ($esSoloLectura): ?>
+            <p class="texto-2" style="margin:0 0 0.75rem;">Estás en modo lector: podés ver este formulario y el listado, pero no crear ni modificar tipos.</p>
+        <?php endif; ?>
         <form method="post">
+            <fieldset <?= $esSoloLectura ? 'disabled' : '' ?> style="border:0; padding:0; margin:0;">
             <input type="hidden" name="accion" value="guardar">
             <input type="hidden" name="id" value="<?= $editando ? (int)$editando['id'] : 0 ?>">
 
@@ -83,11 +99,12 @@ require __DIR__ . '/../includes/header.php';
             <textarea id="descripcion" name="descripcion" style="min-height:70px;"><?= e($editando['descripcion'] ?? $_POST['descripcion'] ?? '') ?></textarea>
 
             <div class="acciones-fila">
-                <button type="submit"><?= $editando ? 'Guardar cambios' : 'Crear tipo' ?></button>
+                <button type="submit" <?= $esSoloLectura ? 'disabled' : '' ?>><?= $editando ? 'Guardar cambios' : 'Crear tipo' ?></button>
                 <?php if ($editando): ?>
                     <a href="admin_tipos_escuela.php" class="boton boton-secundario">Cancelar</a>
                 <?php endif; ?>
             </div>
+            </fieldset>
         </form>
     </div>
 
@@ -113,6 +130,9 @@ require __DIR__ . '/../includes/header.php';
                             <?php endif; ?>
                         </td>
                         <td>
+                            <?php if ($esSoloLectura): ?>
+                                <span class="texto-3 texto-sm">Solo lectura</span>
+                            <?php else: ?>
                             <div style="display:flex; gap:0.4rem;">
                                 <a href="admin_tipos_escuela.php?editar=<?= (int)$t['id'] ?>" class="boton boton-secundario boton-sm">Editar</a>
                                 <form method="post" style="margin:0;" onsubmit="return confirm('¿Confirmar?')">
@@ -123,6 +143,7 @@ require __DIR__ . '/../includes/header.php';
                                     </button>
                                 </form>
                             </div>
+                            <?php endif; ?>
                         </td>
                     </tr>
                 <?php endforeach; ?>

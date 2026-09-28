@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/sesion.php';
-requerirRol(['admin', 'coordinador']);
+// El lector ve los mismos reportes que el admin, en solo lectura.
+requerirRol(['admin', 'coordinador', 'lector']);
 
 $pdo = obtenerConexion();
 $tituloPagina = 'CESDE - Reportes';

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/sesion.php';
-requerirRol(['admin', 'coordinador']);
+// El lector ve las mismas estadísticas que el admin, en solo lectura (sin acciones de escritura en esta página).
+requerirRol(['admin', 'coordinador', 'lector']);
 
 $pdo = obtenerConexion();
 $tituloPagina = 'Estadísticas';

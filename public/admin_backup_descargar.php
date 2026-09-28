@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../config/sesion.php';
-requerirRol(['admin']);
+requerirRol(['admin', 'lector']);
 
 $backupsDir = __DIR__ . '/../backups';
 $archivo = basename((string) ($_GET['archivo'] ?? ''));

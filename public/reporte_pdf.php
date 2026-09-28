@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/sesion.php';
-requerirRol(['admin', 'coordinador']);
+// El lector puede descargar el reporte (solo lectura).
+requerirRol(['admin', 'coordinador', 'lector']);
 require_once __DIR__ . '/../lib/fpdf.php';
 require_once __DIR__ . '/../lib/pdf_texto.php';
 

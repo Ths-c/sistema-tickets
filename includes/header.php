@@ -22,6 +22,7 @@ $etiquetasRol = [
     'coordinador' => 'Coordinador',
     'tecnico'     => 'Técnico',
     'solicitante' => 'Solicitante',
+    'lector'      => 'Lector',
 ];
 
 // Conteo inicial de notificaciones para el badge (server-side, sin delay)
@@ -88,13 +89,13 @@ if ($usuario) {
         <?= navLink('mensajes.php', '✉', 'Mensajes', $paginaActual, $sinLeerMensajes, 'sidebarBadgeMensajes') ?>
         <?php endif; ?>
 
-        <?php if (in_array($usuario['rol'], ['admin', 'coordinador'], true)): ?>
+        <?php if (in_array($usuario['rol'], ['admin', 'coordinador', 'lector'], true)): ?>
         <div class="sidebar-seccion">Gestión</div>
         <?= navLink('estadisticas.php', '↗', 'Estadísticas', $paginaActual) ?>
         <?= navLink('reportes.php',     '≡', 'Reportes',     $paginaActual) ?>
         <?php endif; ?>
 
-        <?php if ($usuario['rol'] === 'admin'): ?>
+        <?php if (in_array($usuario['rol'], ['admin', 'lector'], true)): ?>
         <div class="sidebar-seccion">Administración</div>
         <?= navLink('admin_usuarios.php',     '◉', 'Usuarios',         $paginaActual) ?>
         <?= navLink('admin_escuelas.php',     '◎', 'Escuelas',         $paginaActual) ?>

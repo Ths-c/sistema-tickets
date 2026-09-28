@@ -27,8 +27,9 @@ if (!$ticket) {
 }
 
 // (if/elseif con === estricto: equivale al match de PHP 8).
+// El lector ve la constancia como el admin, pero sin poder editarla.
 $rolActual = $usuario['rol'];
-if ($rolActual === 'admin' || $rolActual === 'coordinador') {
+if ($rolActual === 'admin' || $rolActual === 'coordinador' || $rolActual === 'lector') {
     $puedeVer = true;
 } elseif ($rolActual === 'solicitante') {
     $puedeVer = $ticket['solicitante_id'] === $usuario['id'];
@@ -43,7 +44,9 @@ if (!$puedeVer) {
 }
 
 $esTecnicoAsignado = $usuario['rol'] === 'tecnico' && $ticket['tecnico_id'] === $usuario['id'];
-$puedeEditar = $esAdmin || $usuario['rol'] === 'coordinador' || $esTecnicoAsignado;
+// El lector es solo lectura: ve la constancia pero nunca la edita.
+$esSoloLectura = esRolSoloLectura($usuario['rol']);
+$puedeEditar = !$esSoloLectura && ($esAdmin || $usuario['rol'] === 'coordinador' || $esTecnicoAsignado);
 
 // Técnicos disponibles para elegir en las etapas de asignación y devolución
 // (se guarda el nombre como texto en la constancia, pero se elige de una lista,
@@ -58,6 +61,10 @@ $error = null;
 
 // Los tickets cerrados/cancelados quedan congelados: la constancia ya no se puede modificar.
 $ticketTerminalConst = in_array($ticket['estado'], ['cerrado', 'cancelado'], true);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $esSoloLectura) {
+    $error = 'El rol lector es de solo visualización y no puede modificar la constancia.';
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $puedeEditar && $ticketTerminalConst) {
     $error = 'Este ticket está "' . str_replace('_', ' ', $ticket['estado']) . '". La constancia ya quedó cerrada y no se puede modificar.';
@@ -393,7 +400,7 @@ $etapasParaTecnico = $esTecnicoAsignado
     </div>
 <?php elseif (!$puedeEditar): ?>
     <div class="tarjeta">
-        <p class="texto-secundario">Solo podés consultar e imprimir esta constancia. La completan el técnico, el coordinador o el administrador.</p>
+        <p class="texto-secundario"><?= $esSoloLectura ? 'Estás en modo lector: podés consultar e imprimir/descargar esta constancia, pero no modificarla.' : 'Solo podés consultar e imprimir esta constancia. La completan el técnico, el coordinador o el administrador.' ?></p>
     </div>
 <?php else: ?>
 <form method="post">

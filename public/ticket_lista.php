@@ -6,17 +6,20 @@ $usuario = usuarioActual();
 $pdo = obtenerConexion();
 $tituloPagina = 'Tickets';
 $esAdmin = $usuario['rol'] === 'admin';
+// El lector tiene la misma vista global que el admin (filtros de escuela/fecha),
+// pero sin ninguna acción de escritura (la cancelación masiva sigue siendo solo admin).
+$esVistaAdmin = esVistaAdmin($usuario['rol']);
 $mensajeOk = null;
 $error = null;
 
 $estadosValidos = ['nuevo', 'asignado', 'en_proceso', 'resuelto', 'cerrado', 'cancelado'];
 
 // ── Filtros: estado es para todos los roles; escuela y fecha son ────
-// exclusivos del panel del administrador.
+// exclusivos de la vista del administrador (admin + lector en solo lectura).
 $filtroEstado      = $_GET['estado'] ?? '';
-$filtroEscuelaId   = $esAdmin ? (int) ($_GET['escuela_id'] ?? 0) : 0;
-$filtroFechaDesde  = $esAdmin ? trim($_GET['fecha_desde'] ?? '') : '';
-$filtroFechaHasta  = $esAdmin ? trim($_GET['fecha_hasta'] ?? '') : '';
+$filtroEscuelaId   = $esVistaAdmin ? (int) ($_GET['escuela_id'] ?? 0) : 0;
+$filtroFechaDesde  = $esVistaAdmin ? trim($_GET['fecha_desde'] ?? '') : '';
+$filtroFechaHasta  = $esVistaAdmin ? trim($_GET['fecha_hasta'] ?? '') : '';
 
 function fechaValida(string $f): bool
 {
@@ -36,21 +39,21 @@ if ($usuario['rol'] === 'solicitante') {
     $condiciones[] = 't.tecnico_id = :uid';
     $parametros['uid'] = $usuario['id'];
 }
-// admin y coordinador ven todo
+// admin, coordinador y lector ven todo (el lector en solo lectura)
 
 if (in_array($filtroEstado, $estadosValidos, true)) {
     $condiciones[] = 't.estado = :estado';
     $parametros['estado'] = $filtroEstado;
 }
-if ($esAdmin && $filtroEscuelaId > 0) {
+if ($esVistaAdmin && $filtroEscuelaId > 0) {
     $condiciones[] = 't.escuela_id = :escuela_id';
     $parametros['escuela_id'] = $filtroEscuelaId;
 }
-if ($esAdmin && fechaValida($filtroFechaDesde)) {
+if ($esVistaAdmin && fechaValida($filtroFechaDesde)) {
     $condiciones[] = 'DATE(t.fecha_creacion) >= :fecha_desde';
     $parametros['fecha_desde'] = $filtroFechaDesde;
 }
-if ($esAdmin && fechaValida($filtroFechaHasta)) {
+if ($esVistaAdmin && fechaValida($filtroFechaHasta)) {
     $condiciones[] = 'DATE(t.fecha_creacion) <= :fecha_hasta';
     $parametros['fecha_hasta'] = $filtroFechaHasta;
 }
@@ -120,9 +123,9 @@ if ($esAdmin && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? ''
     }
 }
 
-// ── Escuelas para el selector del filtro (solo admin) ───────────────
+// ── Escuelas para el selector del filtro (vista admin: admin + lector) ─
 $escuelasFiltro = [];
-if ($esAdmin) {
+if ($esVistaAdmin) {
     $escuelasFiltro = $pdo->query('SELECT id, nombre FROM escuelas ORDER BY nombre')->fetchAll();
 }
 
@@ -192,7 +195,7 @@ require __DIR__ . '/../includes/header.php';
             </select>
         </div>
 
-        <?php if ($esAdmin): ?>
+        <?php if ($esVistaAdmin): ?>
         <div>
             <label for="escuela_id">Escuela</label>
             <select id="escuela_id" name="escuela_id">
@@ -216,7 +219,7 @@ require __DIR__ . '/../includes/header.php';
 
         <div class="form-filtros-acciones">
             <button type="submit" class="boton-sm">Filtrar</button>
-            <?php if ($esAdmin && ($filtroEstado || $filtroEscuelaId || $filtroFechaDesde || $filtroFechaHasta)): ?>
+            <?php if ($esVistaAdmin && ($filtroEstado || $filtroEscuelaId || $filtroFechaDesde || $filtroFechaHasta)): ?>
                 <a href="ticket_lista.php" class="boton boton-secundario boton-sm">Limpiar filtros</a>
             <?php endif; ?>
         </div>

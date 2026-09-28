@@ -56,7 +56,7 @@ CREATE TABLE usuarios (
     dni             VARCHAR(15)  NOT NULL UNIQUE,
     email           VARCHAR(150) NULL,
     password_hash   VARCHAR(255) NOT NULL,
-    rol             ENUM('admin','coordinador','tecnico','solicitante') NOT NULL,
+    rol             ENUM('admin','coordinador','tecnico','solicitante','lector') NOT NULL,
     escuela_id      INT NULL,
     anio_curso      VARCHAR(10)  NULL,
     activo          TINYINT(1)   NOT NULL DEFAULT 1,

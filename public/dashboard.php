@@ -18,7 +18,7 @@ if ($usuario['rol'] === 'solicitante') {
 $totales = array_column($stmt->fetchAll(), 'cantidad', 'estado');
 
 $sinAsignar = 0;
-if (in_array($usuario['rol'], ['admin', 'coordinador'], true)) {
+if (in_array($usuario['rol'], ['admin', 'coordinador', 'lector'], true)) {
     $sinAsignar = (int) $pdo->query("SELECT COUNT(*) FROM tickets WHERE estado = 'nuevo'")->fetchColumn();
 }
 
@@ -58,6 +58,7 @@ $etiquetasRol = [
     'coordinador' => 'Coordinador del proyecto',
     'tecnico'     => 'Técnico de soporte (alumno CESDE)',
     'solicitante' => 'Solicitante',
+    'lector'      => 'Lector (solo visualización)',
 ];
 ?>
 
@@ -66,10 +67,14 @@ $etiquetasRol = [
     <p><?= e($etiquetasRol[$usuario['rol']] ?? '') ?></p>
 </div>
 
-<?php if (in_array($usuario['rol'], ['admin', 'coordinador'], true) && $sinAsignar > 0): ?>
+<?php if (in_array($usuario['rol'], ['admin', 'coordinador', 'lector'], true) && $sinAsignar > 0): ?>
     <div class="alerta alerta-error">
         Hay <strong><?= $sinAsignar ?> ticket<?= $sinAsignar > 1 ? 's' : '' ?></strong> sin asignar.
+        <?php if (!esRolSoloLectura($usuario['rol'])): ?>
         <a href="ticket_lista.php?estado=nuevo">Ver y asignar →</a>
+        <?php else: ?>
+        <a href="ticket_lista.php?estado=nuevo">Ver →</a>
+        <?php endif; ?>
     </div>
 <?php endif; ?>
 

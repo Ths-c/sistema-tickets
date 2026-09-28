@@ -4,6 +4,8 @@ requerirLogin();
 
 $usuario = usuarioActual();
 $esAdmin = $usuario['rol'] === 'admin';
+// El lector ve todo como el admin pero no puede ejecutar ninguna acción.
+$esSoloLectura = esRolSoloLectura($usuario['rol']);
 $pdo = obtenerConexion();
 $ticketId = (int) ($_GET['id'] ?? 0);
 
@@ -27,9 +29,11 @@ if (!$ticket) {
 }
 
 // --- Control de acceso: cada rol ve solo lo que le corresponde ---
+// El lector tiene la misma visibilidad global que el admin/coordinador,
+// pero en solo lectura (las acciones POST se bloquean más abajo).
 // (if/elseif con === estricto: equivale al match de PHP 8).
 $rolActual = $usuario['rol'];
-if ($rolActual === 'admin' || $rolActual === 'coordinador') {
+if ($rolActual === 'admin' || $rolActual === 'coordinador' || $rolActual === 'lector') {
     $puedeVer = true;
 } elseif ($rolActual === 'solicitante') {
     $puedeVer = $ticket['solicitante_id'] === $usuario['id'];
@@ -51,7 +55,12 @@ $error = null;
 $acta = obtenerActaEquipo($pdo, $ticketId);
 
 // --- Acciones (POST) ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// El rol lector es 100% solo lectura: se rechaza cualquier POST aunque lo manden a mano.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $esSoloLectura) {
+    $error = 'El rol lector es de solo visualización y no puede realizar acciones.';
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$esSoloLectura) {
     $accion = $_POST['accion'] ?? '';
 
     if ($accion === 'asignar' && in_array($usuario['rol'], ['admin', 'coordinador'], true)
@@ -424,7 +433,7 @@ try {
     $dispositivos = [];
 }
 $cantidadDispositivos = count($dispositivos);
-$puedeGestionarDispositivos = $esAdmin || in_array($usuario['rol'], ['coordinador'], true) || $ticket['solicitante_id'] === $usuario['id'];
+$puedeGestionarDispositivos = !$esSoloLectura && ($esAdmin || in_array($usuario['rol'], ['coordinador'], true) || $ticket['solicitante_id'] === $usuario['id']);
 // Los dispositivos solo se editan en estado "nuevo": al avanzar el ticket quedan fijados.
 $ticketEditable = ($ticket['estado'] === 'nuevo');
 // Los estados terminales quedan congelados: no admiten adjuntos, comentarios ni cambios de prioridad.
@@ -444,7 +453,7 @@ require __DIR__ . '/../includes/header.php';
         <h1>#<?= (int) $ticket['id'] ?> · <?= e($ticket['titulo']) ?></h1>
         <span class="etiqueta estado-<?= e($ticket['estado']) ?>"><?= ucfirst(str_replace('_', ' ', $ticket['estado'])) ?></span>
 
-        <?php if (in_array($usuario['rol'], ['admin', 'coordinador'], true) && !$ticketTerminal): ?>
+        <?php if (in_array($usuario['rol'], ['admin', 'coordinador'], true) && !$ticketTerminal && !$esSoloLectura): ?>
             <form method="post" style="margin:0; display:flex; align-items:center; gap:0.35rem;">
                 <input type="hidden" name="accion" value="cambiar_prioridad">
                 <label for="prioridad" class="texto-3 texto-sm" style="margin:0;">Prioridad:</label>
@@ -463,7 +472,7 @@ require __DIR__ . '/../includes/header.php';
     <?php if (in_array($usuario['rol'], ['admin', 'coordinador'], true)): ?>
         <p class="texto-3 texto-sm" style="margin:0 0 0.5rem;">La prioridad la definen coordinación y administración, no el solicitante.</p>
     <?php endif; ?>
-    <?php if (in_array($usuario['rol'], ['admin', 'coordinador', 'tecnico'], true)): ?>
+    <?php if (in_array($usuario['rol'], ['admin', 'coordinador', 'tecnico', 'lector'], true)): ?>
         <a href="constancia_equipo.php?id=<?= (int) $ticket['id'] ?>" class="boton boton-secundario boton-sm" style="margin-top:0.5rem;">
             📄 Constancia de entrega/recepción
             <span class="etapa-badge <?= actaEtapasCompletas($acta) === 4 ? 'etapa-badge-ok' : 'etapa-badge-pendiente' ?>" style="margin-left:0.4rem;">
@@ -586,6 +595,8 @@ require __DIR__ . '/../includes/header.php';
         <?php endif; ?>
     <?php elseif (!$ticketEditable): ?>
         <p class="texto-3" style="font-size:0.82rem; margin:0;">Este ticket está en estado "<?= e(str_replace('_', ' ', $ticket['estado'])) ?>" y ya no se pueden agregar o quitar dispositivos. Los dispositivos quedaron fijados a los cargados al crear el ticket.</p>
+    <?php elseif ($esSoloLectura): ?>
+        <p class="texto-3" style="font-size:0.82rem; margin:0;">Estás en modo lector: podés ver los dispositivos, pero no agregar ni quitar ninguno.</p>
     <?php else: ?>
         <p class="texto-3" style="font-size:0.82rem; margin:0;">Solo el solicitante del ticket, coordinadores y administradores pueden gestionar los dispositivos.</p>
     <?php endif; ?>
@@ -594,6 +605,10 @@ require __DIR__ . '/../includes/header.php';
 <!-- Acciones según estado y rol -->
 <div class="tarjeta">
     <div class="tarjeta-titulo">Acciones</div>
+
+    <?php if ($esSoloLectura): ?>
+        <p class="texto-2" style="margin:0;">Estás en modo lector: podés ver toda la información del ticket, pero no realizar acciones.</p>
+    <?php endif; ?>
 
     <?php if (($ticket['estado'] === 'nuevo' && in_array($usuario['rol'], ['admin', 'coordinador'], true)) || $esAdmin): ?>
         <?php if (!actaEtapaCompleta($acta, 'entrega')): ?>
@@ -805,6 +820,8 @@ require __DIR__ . '/../includes/header.php';
     <?php endif; ?>
     <?php if ($ticketTerminal): ?>
         <p class="texto-3" style="font-size:0.82rem; margin:0;">Este ticket está en estado "<?= e(str_replace('_', ' ', $ticket['estado'])) ?>" y ya no admite archivos adjuntos.</p>
+    <?php elseif ($esSoloLectura): ?>
+        <p class="texto-3" style="font-size:0.82rem; margin:0.75rem 0 0;">Estás en modo lector: podés ver y descargar los adjuntos, pero no subir archivos.</p>
     <?php else: ?>
     <form method="post" enctype="multipart/form-data">
         <input type="hidden" name="accion" value="subir_adjunto">
@@ -842,6 +859,8 @@ require __DIR__ . '/../includes/header.php';
 
     <?php if ($ticketTerminal): ?>
         <p class="texto-3" style="font-size:0.82rem; margin:1rem 0 0;">Este ticket está en estado "<?= e(str_replace('_', ' ', $ticket['estado'])) ?>" y ya no admite comentarios.</p>
+    <?php elseif ($esSoloLectura): ?>
+        <p class="texto-3" style="font-size:0.82rem; margin:1rem 0 0;">Estás en modo lector: podés leer los comentarios, pero no agregar nuevos.</p>
     <?php else: ?>
     <form method="post" style="margin-top:1rem;">
         <input type="hidden" name="accion" value="comentar">

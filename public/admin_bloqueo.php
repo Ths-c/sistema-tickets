@@ -1,9 +1,11 @@
 <?php
 require_once __DIR__ . '/../config/sesion.php';
-requerirRol(['admin']);
+requerirRol(['admin', 'lector']);
 
 $pdo     = obtenerConexion();
 $usuario = usuarioActual();
+// El lector ve lo mismo que el admin pero en solo lectura (sin POST).
+$esSoloLectura = esRolSoloLectura($usuario['rol'] ?? '');
 $tituloPagina = 'Control de acceso al sistema';
 $ok    = null;
 $error = null;
@@ -11,7 +13,12 @@ $error = null;
 $bloqueado = ticketsBloqueados($pdo);
 
 // ── Acciones POST ────────────────────────────────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// El rol lector es 100% solo lectura: se rechaza cualquier POST aunque lo manden a mano.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $esSoloLectura) {
+    $error = 'El rol lector es de solo visualización y no puede realizar acciones.';
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$esSoloLectura) {
     $accion = $_POST['accion'] ?? '';
 
     if ($accion === 'bloquear') {
@@ -95,6 +102,9 @@ require __DIR__ . '/../includes/header.php';
 
 <?php if ($ok):    ?><div class="alerta alerta-ok"><?= e($ok) ?></div><?php endif; ?>
 <?php if ($error): ?><div class="alerta alerta-error"><?= e($error) ?></div><?php endif; ?>
+<?php if ($esSoloLectura): ?>
+<div class="alerta" style="background:var(--fondo); border:1px solid var(--borde);">Estás en modo lector: podés ver el estado, los límites y los mensajes, pero no modificar nada.</div>
+<?php endif; ?>
 
 <!-- Estado actual + acción principal -->
 <div class="tarjeta" style="border-left: 5px solid <?= $bloqueado ? 'var(--rojo)' : 'var(--verde)' ?>; margin-bottom:1.25rem;">
@@ -122,7 +132,11 @@ require __DIR__ . '/../includes/header.php';
         </div>
 
         <div style="display:flex; gap:0.75rem; flex-shrink:0;">
-            <?php if (!$bloqueado): ?>
+            <?php if ($esSoloLectura): ?>
+                <button type="button" class="boton boton-secundario" style="margin:0;" disabled>
+                    <?= $bloqueado ? '🔒 Sistema bloqueado (solo lectura)' : '✓ Sistema habilitado (solo lectura)' ?>
+                </button>
+            <?php elseif (!$bloqueado): ?>
                 <form method="post" onsubmit="return confirm('¿Confirmar bloqueo? Los usuarios no podrán crear tickets hasta que vuelvas a habilitarlo.')">
                     <input type="hidden" name="accion" value="bloquear">
                     <button type="submit" class="boton-peligro boton" style="margin:0;">
@@ -176,6 +190,7 @@ require __DIR__ . '/../includes/header.php';
         sus solicitantes no van a poder crear tickets nuevos hasta que se resuelvan o cancelen algunos.
     </p>
     <form method="post" style="display:flex; align-items:flex-end; gap:0.75rem; flex-wrap:wrap;">
+        <fieldset <?= $esSoloLectura ? 'disabled' : '' ?> style="border:0; padding:0; margin:0; display:flex; align-items:flex-end; gap:0.75rem; flex-wrap:wrap;">
         <input type="hidden" name="accion" value="guardar_limite">
         <div style="min-width:160px;">
             <label for="limite_tickets">Tickets abiertos máximos</label>
@@ -183,8 +198,9 @@ require __DIR__ . '/../includes/header.php';
                    value="<?= (int) $limiteActual ?>">
         </div>
         <div class="acciones-fila" style="margin:0;">
-            <button type="submit">Guardar límite</button>
+            <button type="submit" <?= $esSoloLectura ? 'disabled' : '' ?>>Guardar límite</button>
         </div>
+        </fieldset>
     </form>
 </div>
 
@@ -197,6 +213,7 @@ require __DIR__ . '/../includes/header.php';
         El límite se controla tanto al crear el ticket como al agregar dispositivos después, desde el detalle del ticket.
     </p>
     <form method="post" style="display:flex; align-items:flex-end; gap:0.75rem; flex-wrap:wrap;">
+        <fieldset <?= $esSoloLectura ? 'disabled' : '' ?> style="border:0; padding:0; margin:0; display:flex; align-items:flex-end; gap:0.75rem; flex-wrap:wrap;">
         <input type="hidden" name="accion" value="guardar_limite_dispositivos">
         <div style="min-width:160px;">
             <label for="limite_dispositivos">Dispositivos máximos por ticket</label>
@@ -204,8 +221,9 @@ require __DIR__ . '/../includes/header.php';
                    value="<?= (int) $limiteDispositivosActual ?>">
         </div>
         <div class="acciones-fila" style="margin:0;">
-            <button type="submit">Guardar límite</button>
+            <button type="submit" <?= $esSoloLectura ? 'disabled' : '' ?>>Guardar límite</button>
         </div>
+        </fieldset>
         <span class="texto-3" style="align-self:center; margin-left:0.5rem;">Actual: <?= (int)$limiteDispositivosActual ?> por ticket</span>
     </form>
     <p class="texto-3" style="margin-top:0.6rem;">
@@ -251,6 +269,7 @@ require __DIR__ . '/../includes/header.php';
     </p>
 
     <form method="post">
+        <fieldset <?= $esSoloLectura ? 'disabled' : '' ?> style="border:0; padding:0; margin:0;">
         <input type="hidden" name="accion" value="guardar_mensajes">
 
         <label for="msg_bloqueo">
@@ -272,8 +291,9 @@ require __DIR__ . '/../includes/header.php';
         </p>
 
         <div class="acciones-fila">
-            <button type="submit">Guardar mensajes</button>
+            <button type="submit" <?= $esSoloLectura ? 'disabled' : '' ?>>Guardar mensajes</button>
         </div>
+        </fieldset>
     </form>
 </div>
 

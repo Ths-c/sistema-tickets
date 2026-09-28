@@ -39,6 +39,25 @@ function requerirRol(array $rolesPermitidos): void
     }
 }
 
+/**
+ * Indica si un rol es de solo lectura (ve lo mismo que el admin pero no modifica nada).
+ * Uso: if (esRolSoloLectura($usuario['rol'])) { bloquear POST / ocultar formularios }
+ */
+function esRolSoloLectura(string $rol): bool
+{
+    return $rol === 'lector';
+}
+
+/**
+ * Indica si un rol tiene la vista global del administrador
+ * (todos los tickets, filtros de escuela/fecha, estadísticas, reportes).
+ * El lector la tiene para lectura; el admin además puede modificar.
+ */
+function esVistaAdmin(string $rol): bool
+{
+    return in_array($rol, ['admin', 'lector'], true);
+}
+
 /** Deja solo los dígitos de un DNI, sin importar cómo lo haya tipeado la persona (con puntos, espacios, etc). */
 function normalizarDni(string $dni): string
 {

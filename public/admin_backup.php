@@ -1,9 +1,11 @@
 <?php
 require_once __DIR__ . '/../config/sesion.php';
-requerirRol(['admin']);
+requerirRol(['admin', 'lector']);
 
 $pdo = obtenerConexion();
 $usuario = usuarioActual();
+// El lector ve el historial y puede descargar, pero no generar ni eliminar.
+$esSoloLectura = esRolSoloLectura($usuario['rol'] ?? '');
 $tituloPagina = 'Backup de base de datos';
 
 // Directorio de backups (fuera de public/, no accesible directamente)
@@ -81,7 +83,12 @@ function backupEsValido(string $sql): bool {
 }
 
 // ── Acciones POST ────────────────────────────────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// El rol lector es 100% solo lectura: se rechaza cualquier POST aunque lo manden a mano.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $esSoloLectura) {
+    $error = 'El rol lector es de solo visualización y no puede generar ni eliminar backups.';
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$esSoloLectura) {
     $accion = $_POST['accion'] ?? '';
 
     if ($accion === 'generar') {
@@ -261,6 +268,9 @@ require __DIR__ . '/../includes/header.php';
 
 <?php if ($ok):    ?><div class="alerta alerta-ok"><?= $ok ?></div><?php endif; ?>
 <?php if ($error): ?><div class="alerta alerta-error"><?= $error ?></div><?php endif; ?>
+<?php if ($esSoloLectura): ?>
+<div class="alerta" style="background:var(--fondo); border:1px solid var(--borde);">Estás en modo lector: podés ver el historial y descargar backups, pero no generar ni eliminar.</div>
+<?php endif; ?>
 
 <!-- Acción principal: generar backup -->
 <div class="tarjeta" style="border-left:5px solid var(--acento); display:flex; align-items:center; gap:1.5rem; flex-wrap:wrap;">
@@ -286,6 +296,11 @@ require __DIR__ . '/../includes/header.php';
         </p>
     </div>
 
+    <?php if ($esSoloLectura): ?>
+        <button type="button" class="boton boton-secundario" style="margin:0; flex-shrink:0;" disabled>
+            <span>💾</span> Generar backup (solo lectura)
+        </button>
+    <?php else: ?>
     <form method="post" id="formGenerar" style="flex-shrink:0;"
           onsubmit="return confirm('¿Generar un nuevo backup de la base de datos? El proceso puede tardar unos segundos.')">
         <input type="hidden" name="accion" value="generar">
@@ -293,6 +308,7 @@ require __DIR__ . '/../includes/header.php';
             <span id="iconoBtn">💾</span> Generar backup
         </button>
     </form>
+    <?php endif; ?>
 </div>
 
 <!-- Métricas -->
@@ -348,11 +364,15 @@ require __DIR__ . '/../includes/header.php';
                     <td>
                         <div class="acciones-tabla">
                             <a href="<?= e($b['descargar']) ?>" class="boton boton-secundario boton-sm">⬇ Descargar</a>
+                            <?php if ($esSoloLectura): ?>
+                                <span class="texto-3 texto-sm">Solo lectura</span>
+                            <?php else: ?>
                             <form method="post" onsubmit="return confirm('¿Eliminar este backup? No se podrá recuperar.')">
                                 <input type="hidden" name="accion" value="eliminar">
                                 <input type="hidden" name="archivo" value="<?= e($b['nombre']) ?>">
                                 <button type="submit" class="boton boton-peligro boton-sm">🗑 Eliminar</button>
                             </form>
+                            <?php endif; ?>
                         </div>
                     </td>
                 </tr>

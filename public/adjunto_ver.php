@@ -19,10 +19,11 @@ if (!$adjunto) {
     die('Adjunto no encontrado.');
 }
 
-// Mismo criterio de acceso que en ticket_detalle.php
+// Mismo criterio de acceso que en ticket_detalle.php.
+// El lector ve/descarga los adjuntos como el admin (solo lectura).
 // (if/elseif con === estricto: equivale al match de PHP 8).
 $rolActual = $usuario['rol'];
-if ($rolActual === 'admin' || $rolActual === 'coordinador') {
+if ($rolActual === 'admin' || $rolActual === 'coordinador' || $rolActual === 'lector') {
     $puedeVer = true;
 } elseif ($rolActual === 'solicitante') {
     $puedeVer = $adjunto['solicitante_id'] === $usuario['id'];

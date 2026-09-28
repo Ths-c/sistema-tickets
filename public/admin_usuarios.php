@@ -1,8 +1,11 @@
 <?php
 require_once __DIR__ . '/../config/sesion.php';
-requerirRol(['admin']);
+requerirRol(['admin', 'lector']);
 
 $pdo = obtenerConexion();
+// El lector ve lo mismo que el admin pero en solo lectura (sin POST).
+$usuarioActual = usuarioActual();
+$esSoloLectura = esRolSoloLectura($usuarioActual['rol'] ?? '');
 $tituloPagina = 'Usuarios';
 $error = null;
 $mensajeOk = null;
@@ -11,16 +14,20 @@ $escuelas = $pdo->query('SELECT id, nombre FROM escuelas ORDER BY nombre')->fetc
 
 $rolesValidos = ['admin', 'coordinador', 'tecnico', 'solicitante', 'lector'];
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'crear') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $esSoloLectura) {
+    $error = 'El rol lector es de solo visualización y no puede realizar acciones.';
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$esSoloLectura && ($_POST['accion'] ?? '') === 'crear') {
     $nombre = trim($_POST['nombre'] ?? '');
     $apellido = trim($_POST['apellido'] ?? '');
     $dni = normalizarDni($_POST['dni'] ?? '');
     $email = trim($_POST['email'] ?? '') ?: null;
     $rol = $_POST['rol'] ?? '';
     $escuelaId = (int) ($_POST['escuela_id'] ?? 0) ?: null;
-    // admin y coordinador no pertenecen a una escuela puntual: se ignora
+    // admin, coordinador y lector no pertenecen a una escuela puntual: se ignora
     // cualquier valor que llegue en el campo, aunque lo manipulen a mano.
-    if (in_array($rol, ['admin', 'coordinador'], true)) {
+    if (in_array($rol, ['admin', 'coordinador', 'lector'], true)) {
         $escuelaId = null;
     }
     $anioCurso = trim($_POST['anio_curso'] ?? '') ?: null;
@@ -47,13 +54,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'crear
     }
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'desactivar') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$esSoloLectura && ($_POST['accion'] ?? '') === 'desactivar') {
     $uid = (int) ($_POST['usuario_id'] ?? 0);
     $pdo->prepare('UPDATE usuarios SET activo = 0 WHERE id = :id')->execute(['id' => $uid]);
     $mensajeOk = 'Usuario desactivado.';
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'reset_password') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$esSoloLectura && ($_POST['accion'] ?? '') === 'reset_password') {
     $uid = (int) ($_POST['usuario_id'] ?? 0);
     $nueva = $_POST['nueva_password'] ?? '';
     $confirmar = $_POST['confirmar_password'] ?? '';
@@ -129,7 +136,11 @@ require __DIR__ . '/../includes/header.php';
 
 <div class="tarjeta">
     <h2>Crear usuario</h2>
+    <?php if ($esSoloLectura): ?>
+        <p class="texto-2" style="margin:0 0 0.75rem;">Estás en modo lector: podés ver este formulario y el listado, pero no crear, desactivar ni restablecer usuarios.</p>
+    <?php endif; ?>
     <form method="post">
+        <fieldset <?= $esSoloLectura ? 'disabled' : '' ?> style="border:0; padding:0; margin:0;">
         <input type="hidden" name="accion" value="crear">
         <div class="grid-2">
             <div>
@@ -152,7 +163,7 @@ require __DIR__ . '/../includes/header.php';
                 <label for="rol">Rol</label>
                 <select id="rol" name="rol" required onchange="
                     document.getElementById('campo_anio').style.display = this.value === 'tecnico' ? 'block' : 'none';
-                    document.getElementById('campo_escuela').style.display = (this.value === 'admin' || this.value === 'coordinador') ? 'none' : 'block';
+                    document.getElementById('campo_escuela').style.display = (this.value === 'admin' || this.value === 'coordinador' || this.value === 'lector') ? 'none' : 'block';
                 ">
                     <option value="">Seleccioná un rol</option>
 
@@ -193,7 +204,8 @@ require __DIR__ . '/../includes/header.php';
             </button>
         </div>
 
-        <button type="submit">Crear usuario</button>
+        <button type="submit" <?= $esSoloLectura ? 'disabled' : '' ?>>Crear usuario</button>
+        </fieldset>
     </form>
 </div>
 
@@ -253,6 +265,9 @@ require __DIR__ . '/../includes/header.php';
                 <td><?= e($u['escuela_nombre'] ?? '—') ?></td>
                 <td><?= $u['activo'] ? 'Activo' : 'Inactivo' ?></td>
                 <td>
+                    <?php if ($esSoloLectura): ?>
+                        <span class="texto-3" style="font-size:0.82rem;">Solo lectura</span>
+                    <?php else: ?>
                     <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
                         <button type="button"
                             class="btn-reset-password"
@@ -269,6 +284,7 @@ require __DIR__ . '/../includes/header.php';
                         </form>
                         <?php endif; ?>
                     </div>
+                    <?php endif; ?>
                 </td>
             </tr>
         <?php endforeach; ?>
@@ -278,6 +294,7 @@ require __DIR__ . '/../includes/header.php';
     <?php endif; ?>
 </div>
 
+<?php if (!$esSoloLectura): ?>
 <div id="resetOverlay" class="reset-overlay" hidden>
     <div class="reset-modal" role="dialog" aria-modal="true" aria-labelledby="resetTitulo">
         <form method="post" id="formReset">
@@ -326,6 +343,7 @@ require __DIR__ . '/../includes/header.php';
         </form>
     </div>
 </div>
+<?php endif; ?>
 
 <script>
 (function() {
@@ -351,6 +369,8 @@ require __DIR__ . '/../includes/header.php';
 
     var overlay = document.getElementById('resetOverlay');
     var form = document.getElementById('formReset');
+    // En modo lector el modal no se renderiza: se salta toda su lógica.
+    var tieneModalReset = !!(overlay && form);
     var inputId = document.getElementById('resetUsuarioId');
     var spanNombre = document.getElementById('resetNombre');
     var spanAvatar = document.getElementById('resetAvatar');
@@ -367,6 +387,7 @@ require __DIR__ . '/../includes/header.php';
     }
 
     function ocultarPasswordsModal() {
+        if (!tieneModalReset) return;
         [nueva, confirmar].forEach(function(input) {
             if (input) input.type = 'password';
         });
@@ -384,6 +405,7 @@ require __DIR__ . '/../includes/header.php';
     }
 
     function abrir(nombre, id) {
+        if (!tieneModalReset) return;
         inputId.value = id;
         spanNombre.textContent = nombre;
         spanAvatar.textContent = iniciales(nombre);
@@ -398,6 +420,7 @@ require __DIR__ . '/../includes/header.php';
     }
 
     function cerrar() {
+        if (!tieneModalReset) return;
         overlay.hidden = true;
         document.body.style.overflow = '';
         form.reset();
@@ -413,8 +436,9 @@ require __DIR__ . '/../includes/header.php';
         });
     });
 
-    btnCancelar.addEventListener('click', cerrar);
-    btnCerrar.addEventListener('click', cerrar);
+    if (tieneModalReset) {
+    if (btnCancelar) btnCancelar.addEventListener('click', cerrar);
+    if (btnCerrar) btnCerrar.addEventListener('click', cerrar);
     overlay.addEventListener('click', function(e) {
         if (e.target === overlay) cerrar();
     });
@@ -423,6 +447,7 @@ require __DIR__ . '/../includes/header.php';
     });
 
     [nueva, confirmar].forEach(function(el) {
+        if (!el) return;
         el.addEventListener('input', function() {
             var distinto = nueva.value && confirmar.value && nueva.value !== confirmar.value;
             aviso.classList.toggle('visible', !!distinto);
@@ -445,6 +470,7 @@ require __DIR__ . '/../includes/header.php';
             alert('Las contraseñas no coinciden.');
         }
     });
+    }
 
     // ── Búsqueda híbrida: refinado instantáneo sobre lo ya filtrado por SQL ──
     var inputQ = document.getElementById('q');

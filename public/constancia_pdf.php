@@ -92,8 +92,9 @@ $ticket = $stmt->fetch();
 if (!$ticket) { http_response_code(404); die('Ticket no encontrado.'); }
 
 // (if/elseif con === estricto: equivale al match de PHP 8).
+// El lector puede descargar la constancia (solo lectura).
 $rolActual = $usuario['rol'];
-if ($rolActual === 'admin' || $rolActual === 'coordinador') {
+if ($rolActual === 'admin' || $rolActual === 'coordinador' || $rolActual === 'lector') {
     $puedeVer = true;
 } elseif ($rolActual === 'solicitante') {
     $puedeVer = $ticket['solicitante_id'] === $usuario['id'];
